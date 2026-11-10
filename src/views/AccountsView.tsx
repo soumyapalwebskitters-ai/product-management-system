@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { formatWhen, paymentLabel, rupees } from '../format'
 import { orderDue } from '../paymentStatus'
 import { matchesQuery } from '../search'
 import { useMarket } from '../store'
+import { ProductPhoto } from '../components/ProductImageField'
 import type { CustomerOrder, PaymentMethod } from '../types'
 
 const methods: PaymentMethod[] = ['cash', 'upi', 'card', 'bank']
@@ -49,6 +50,7 @@ export function AccountsView() {
   const received = inRange.reduce((sum, order) => sum + receivedOn(order, null), 0)
   const due = inRange.reduce((sum, order) => sum + orderDue(order), 0)
   const buyerCount = new Set(inRange.map((order) => order.buyerId)).size
+  const analytics = useMemo(() => accountAnalytics(state), [state])
 
   return (
     <section data-testid="view-accounts">
@@ -79,6 +81,35 @@ export function AccountsView() {
           <span>{buyerCount === 1 ? 'Buyer account' : 'Buyer accounts'}</span>
         </article>
       </div>
+
+      <section className="account-dashboard" aria-label="Business performance">
+        <div className="page-head compact-head">
+          <div>
+            <h3>Profit and loss</h3>
+            <p className="lede">Sales, purchase cost, and product demand across all active orders.</p>
+          </div>
+        </div>
+        <div className="summary profit-summary">
+          <article><strong>{rupees(analytics.sales)}</strong><span>Total earned from sales</span></article>
+          <article><strong>{rupees(analytics.purchaseCost)}</strong><span>Cost of sold items</span></article>
+          <article className={analytics.profit < 0 ? 'loss' : 'profit'}><strong>{rupees(analytics.profit)}</strong><span>{analytics.profit < 0 ? 'Net loss' : 'Net profit'}</span></article>
+          <article><strong>{rupees(analytics.purchased)}</strong><span>Total spent on purchases</span></article>
+        </div>
+        <div className="account-charts">
+          <article className="account-chart">
+            <h3>Sales by payment method</h3>
+            <PaymentPie values={analytics.paymentMethods} />
+          </article>
+          <article className="account-chart wide-chart">
+            <h3>Order frequency</h3>
+            <OrderBars values={analytics.orderDays} />
+          </article>
+          <article className="account-chart">
+            <h3>Product selling status</h3>
+            <ProductSalesGraph values={analytics.products} />
+          </article>
+        </div>
+      </section>
 
       <div className="summary account-row">
         {methods.map((method) => {
@@ -161,7 +192,7 @@ export function AccountsView() {
         <>
           <h3 className="section-label">Buyer accounts</h3>
           <div className="table-wrap">
-            <table>
+            <table className="responsive">
               <thead>
                 <tr>
                   <th>Buyer</th>
@@ -174,14 +205,14 @@ export function AccountsView() {
               <tbody>
                 {buyers.map((buyer) => (
                   <tr key={buyer.id}>
-                    <td>
+                    <td data-label="Buyer">
                       <strong>{buyer.name}</strong>
                       {buyer.phone && <div className="pending">{buyer.phone}</div>}
                     </td>
-                    <td className="num">{buyer.sales.toLocaleString()}</td>
-                    <td className="num">{rupees(buyer.received)}</td>
-                    <td className="num">{rupees(buyer.due)}</td>
-                    <td>{formatWhen(buyer.lastAt)}</td>
+                    <td data-label="Sales" className="num">{buyer.sales.toLocaleString()}</td>
+                    <td data-label="Received" className="num">{rupees(buyer.received)}</td>
+                    <td data-label="Due" className="num">{rupees(buyer.due)}</td>
+                    <td data-label="Last sale">{formatWhen(buyer.lastAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -190,7 +221,7 @@ export function AccountsView() {
 
           <h3 className="section-label">Sales</h3>
           <div className="table-wrap">
-            <table>
+            <table className="responsive">
               <thead>
                 <tr>
                   <th>When</th>
@@ -204,12 +235,12 @@ export function AccountsView() {
               <tbody>
                 {entries.map((order) => (
                   <tr key={order.id}>
-                    <td>{formatWhen(order.createdAt)}</td>
-                    <td>{order.buyerName}</td>
-                    <td>{order.number}</td>
-                    <td>{paymentLabel(order.paymentMethod)}</td>
-                    <td className="num">{rupees(receivedOn(order, null))}</td>
-                    <td className="num">{rupees(orderDue(order))}</td>
+                    <td data-label="When">{formatWhen(order.createdAt)}</td>
+                    <td data-label="Buyer">{order.buyerName}</td>
+                    <td data-label="Order">{order.number}</td>
+                    <td data-label="Account">{paymentLabel(order.paymentMethod)}</td>
+                    <td data-label="Received" className="num">{rupees(receivedOn(order, null))}</td>
+                    <td data-label="Due" className="num">{rupees(orderDue(order))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -219,6 +250,39 @@ export function AccountsView() {
       )}
     </section>
   )
+}
+
+function accountAnalytics(state: ReturnType<typeof useMarket>['state']) {
+  const orders = state.orders.filter((order) => order.status !== 'cancelled')
+  const variants = new Map(state.products.flatMap((product) => product.variants.map((variant) => [variant.id, variant])))
+  const sales = orders.reduce((sum, order) => sum + order.total, 0)
+  const purchaseCost = orders.reduce((sum, order) => sum + order.lines.reduce((lineTotal, line) => lineTotal + line.quantity * (variants.get(line.variantId)?.buyingPrice ?? 0), 0), 0)
+  const purchased = state.purchases.reduce((sum, purchase) => sum + purchase.orderedItems * (variants.get(purchase.variantId)?.buyingPrice ?? 0), 0)
+  const paymentMethods = methods.map((method) => ({ label: paymentLabel(method), value: orders.filter((order) => order.paymentMethod === method).reduce((sum, order) => sum + order.total, 0) })).filter((item) => item.value > 0)
+  const productImages = new Map(state.products.map((product) => [product.id, product.image ?? '']))
+  const productMap = new Map<string, { id: string; name: string; image: string; quantity: number; revenue: number }>()
+  for (const order of orders) for (const line of order.lines) { const current = productMap.get(line.variantId) ?? { id: line.variantId, name: `${line.productName}${line.variantName ? ` · ${line.variantName}` : ''}`, image: productImages.get(line.productId) ?? '', quantity: 0, revenue: 0 }; current.quantity += line.quantity; current.revenue += line.quantity * line.unitPrice; productMap.set(line.variantId, current) }
+  const byDay = new Map<string, number>()
+  for (const order of orders) { const day = dayKey(order.createdAt); byDay.set(day, (byDay.get(day) ?? 0) + 1) }
+  const orderDays = [...byDay.entries()].sort(([left], [right]) => left.localeCompare(right)).slice(-7).map(([day, count]) => ({ day: new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(new Date(`${day}T00:00:00`)), count }))
+  return { sales, purchaseCost, purchased, profit: sales - purchaseCost, paymentMethods, orderDays, products: [...productMap.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name)).slice(0, 5) }
+}
+
+function PaymentPie({ values }: { values: Array<{ label: string; value: number }> }) {
+  const total = values.reduce((sum, item) => sum + item.value, 0)
+  if (!total) return <p className="hint">No payment data yet.</p>
+  let angle = -Math.PI / 2
+  return <div className="pie-wrap"><svg className="payment-pie" viewBox="0 0 120 120" role="img" aria-label="Sales by payment method"><title>Sales by payment method</title>{values.map((item, index) => { const next = angle + (item.value / total) * Math.PI * 2; const path = pieSlice(60, 60, 52, angle, next); angle = next; return <path key={item.label} className={`pie-${index}`} d={path}><title>{`${item.label}: ${rupees(item.value)}`}</title></path> })}<circle cx="60" cy="60" r="28" className="pie-hole"/><text x="60" y="57" textAnchor="middle">Total</text><text x="60" y="72" textAnchor="middle" className="pie-total">{rupees(total)}</text></svg><ul className="chart-legend">{values.map((item, index) => <li key={item.label}><i className={`pie-${index}`} />{item.label}<strong>{rupees(item.value)}</strong></li>)}</ul></div>
+}
+
+function pieSlice(cx: number, cy: number, radius: number, start: number, end: number) { const point = (angle: number) => `${cx + radius * Math.cos(angle)} ${cy + radius * Math.sin(angle)}`; return `M ${cx} ${cy} L ${point(start)} A ${radius} ${radius} 0 ${end - start > Math.PI ? 1 : 0} 1 ${point(end)} Z` }
+
+function OrderBars({ values }: { values: Array<{ day: string; count: number }> }) { const max = Math.max(1, ...values.map((item) => item.count)); return values.length ? <div className="order-bars" role="img" aria-label="Orders by day">{values.map((item) => <div key={item.day}><strong>{item.count}</strong><i style={{ height: `${(item.count / max) * 100}%` }} title={`${item.day}: ${item.count} orders`} /><span>{item.day}</span></div>)}</div> : <p className="hint">Order frequency will appear after sales are recorded.</p> }
+
+function ProductSalesGraph({ values }: { values: Array<{ id: string; name: string; image: string; quantity: number; revenue: number }> }) {
+  if (!values.length) return <p className="hint">Product selling status will appear after sales are recorded.</p>
+  const highest = Math.max(...values.map((item) => item.quantity))
+  return <ol className="product-sales-graph" role="img" aria-label="Top products by units sold">{values.map((item) => <li key={item.id}><div><span className="item-with-photo"><ProductPhoto src={item.image} name={item.name} />{item.name}</span><strong>{item.quantity.toLocaleString()} sold</strong></div><div className="product-bar"><i style={{ width: `${(item.quantity / highest) * 100}%` }} /></div><small>{rupees(item.revenue)} earned</small></li>)}</ol>
 }
 
 function receivedOn(order: CustomerOrder, account: PaymentMethod | null) {

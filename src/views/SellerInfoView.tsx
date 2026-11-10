@@ -17,6 +17,8 @@ export function SellerInfoView() {
   const [youtube, setYoutube] = useState(seller?.youtube ?? '')
   const [whatsapp, setWhatsapp] = useState(seller?.whatsapp ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [sellerPassword, setSellerPassword] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState('')
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -91,6 +93,13 @@ export function SellerInfoView() {
               onChange={(event) => setGst(event.target.value)}
             />
           </label>
+        </section>
+        <section className="form-group">
+          <h3 className="section-label">🔒 Seller access</h3>
+          <p className="hint">Set or reset the password used when opening Seller. This password is stored on this device.</p>
+          <label className="field" htmlFor={`${formId}-password`}><span>New seller password</span><input id={`${formId}-password`} type="password" autoComplete="new-password" value={sellerPassword} onChange={event=>setSellerPassword(event.target.value)} /></label>
+          <div className="dialog-actions"><button type="button" className="btn secondary" onClick={()=>{localStorage.removeItem('market.seller.password');localStorage.removeItem('market.seller.unlocked');setSellerPassword('');setPasswordMessage('Seller password removed. Seller access will open without a password until you set one.') }}>Remove password</button><button type="button" className="btn" onClick={()=>{if(!sellerPassword.trim()){setPasswordMessage('Enter a password first.');return}localStorage.setItem('market.seller.password',sellerPassword);localStorage.setItem('market.seller.unlocked','true');setSellerPassword('');setPasswordMessage('Seller password saved on this device.') }}>Save password</button></div>
+          {passwordMessage && <p role="status" className="hint">{passwordMessage}</p>}
         </section>
         <section className="form-group">
           <h3 className="section-label">Photos</h3>

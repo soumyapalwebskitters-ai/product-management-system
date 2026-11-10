@@ -487,7 +487,7 @@ function PurchaseDetail({
           <dt>Order items:</dt>
           <dd>
             <div className="order-items-box">
-              <table className="order-items-table">
+              <table className="order-items-table responsive">
                 <thead>
                   <tr>
                     <th>Item</th>
@@ -499,7 +499,7 @@ function PurchaseDetail({
                 <tbody>
                   {order.lines.map((line) => (
                     <tr key={`${line.variantId}-${line.quantity}`}>
-                      <td>
+                      <td data-label="Item">
                         <span className="item-with-photo">
                           <ProductPhoto src={productImage(products, line.productId)} name={line.productName} />
                           <span>
@@ -507,15 +507,15 @@ function PurchaseDetail({
                           </span>
                         </span>
                       </td>
-                      <td className="num">{line.quantity}</td>
-                      <td className="num">{rupees(line.unitPrice)}</td>
-                      <td className="num">{rupees(line.quantity * line.unitPrice)}</td>
+                      <td data-label="Quantity" className="num">{line.quantity}</td>
+                      <td data-label="Unit price" className="num">{rupees(line.unitPrice)}</td>
+                      <td data-label="Amount" className="num">{rupees(line.quantity * line.unitPrice)}</td>
                     </tr>
                   ))}
                   {order.offer?.kind === 'gift' &&
                     order.offer.items.map((item) => (
                       <tr key={`gift-${item.variantId}`}>
-                        <td>
+                        <td data-label="Item">
                           <span className="item-with-photo">
                             <ProductPhoto src={productImage(products, item.productId)} name={item.productName} />
                             <span>
@@ -523,9 +523,9 @@ function PurchaseDetail({
                             </span>
                           </span>
                         </td>
-                        <td className="num">{item.quantity}</td>
-                        <td className="num">Gift</td>
-                        <td className="num">{rupees(0)}</td>
+                        <td data-label="Quantity" className="num">{item.quantity}</td>
+                        <td data-label="Unit price" className="num">Gift</td>
+                        <td data-label="Amount" className="num">{rupees(0)}</td>
                       </tr>
                     ))}
                 </tbody>

@@ -8,6 +8,7 @@ import { boxesLabel, rupees } from '../format'
 import { calcPurchase, needsRestock } from '../purchase'
 import { catalogStats, onOrderItems, stockStatus } from '../inventory'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
+import { ProductPhoto } from '../components/ProductImageField'
 import { matchesQuery, type SearchMode } from '../search'
 import { useMarket } from '../store'
 import type { Product, Variant } from '../types'
@@ -152,7 +153,7 @@ export function ProductsView() {
 
       {visible.length > 0 && (
         <div className="table-scroll" data-testid="product-table">
-          <table className="catalog-table">
+          <table className="catalog-table responsive">
             <thead>
               <tr>
                 <th>Product</th>
@@ -192,8 +193,8 @@ export function ProductsView() {
                   return (
                     <tr key={variant.id} className={status === 'ok' ? undefined : status}>
                       {index === 0 && (
-                        <td className="product-cell" rowSpan={variants.length}>
-                          <strong>{product.name}</strong>
+                        <td data-label="Product" className="product-cell" rowSpan={variants.length}>
+                          <span className="item-with-photo"><ProductPhoto src={product.image ?? ''} name={product.name} /><strong>{product.name}</strong></span>
                           {product.note && <div className="pending">{product.note}</div>}
                           <div className="row-actions">
                             <button type="button" className="btn secondary small" onClick={() => setEditing(product)}>
@@ -209,34 +210,34 @@ export function ProductsView() {
                           </div>
                         </td>
                       )}
-                      <td>
+                      <td data-label="Variant">
                         <strong>{variant.name}</strong>
                         {pending > 0 && <div className="pending">{pending.toLocaleString()} on order</div>}
                       </td>
-                      <td className="sku">{variant.sku}</td>
-                      <td className="num">{rupees(variant.price)}</td>
-                      <td className="num">{rupees(variant.buyingPrice ?? 0)}</td>
-                      <td className="num">{variant.itemsPerBox.toLocaleString()}</td>
-                      <td className="num">{rupees(boxPrice)}</td>
-                      <td className="num">
+                      <td data-label="SKU" className="sku">{variant.sku}</td>
+                      <td data-label="Unit price" className="num">{rupees(variant.price)}</td>
+                      <td data-label="Buying price" className="num">{rupees(variant.buyingPrice ?? 0)}</td>
+                      <td data-label="Per box" className="num">{variant.itemsPerBox.toLocaleString()}</td>
+                      <td data-label="Box price" className="num">{rupees(boxPrice)}</td>
+                      <td data-label="Current stock" className="num">
                         {variant.currentStock.toLocaleString()}
                         <div className={`meter ${status}`} aria-hidden="true">
                           <span style={{ width: `${coverage}%` }} />
                         </div>
                       </td>
-                      <td className="num">{rupees(stockValue)}</td>
-                      <td className="num">{variant.minimumStock.toLocaleString()}</td>
-                      <td className="num">
+                      <td data-label="Stock value" className="num">{rupees(stockValue)}</td>
+                      <td data-label="Minimum stock" className="num">{variant.minimumStock.toLocaleString()}</td>
+                      <td data-label="Desired stock" className="num">
                         <DesiredField
                           value={variant.desiredStock}
                           label={`Desired stock for ${product.name} ${variant.name}`}
                           onSave={(desired) => market.setDesired(product.id, variant.id, desired)}
                         />
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <StatusPill status={status} />
                       </td>
-                      <td className="num">
+                      <td data-label="To buy" className="num">
                         {needsRestock(variant.currentStock, variant.minimumStock) ? (
                           <span className="to-buy">
                             {calc.purchaseQty.toLocaleString()}
@@ -246,30 +247,14 @@ export function ProductsView() {
                           '—'
                         )}
                       </td>
-                      <td className="actions">
+                      <td data-label="Actions" className="actions">
                         <div className="row-actions">
-                          <button
-                            type="button"
-                            className="btn secondary small"
-                            disabled={variant.currentStock <= 0}
-                            title={variant.currentStock <= 0 ? 'Nothing in stock' : undefined}
-                            onClick={() => setStockTarget({ mode: 'sale', product, variant })}
-                          >
-                            Sell
-                          </button>
                           <button
                             type="button"
                             className="btn secondary small"
                             onClick={() => setStockTarget({ mode: 'adjust', product, variant })}
                           >
                             Adjust
-                          </button>
-                          <button
-                            type="button"
-                            className="btn secondary small"
-                            onClick={() => setStockTarget({ mode: 'receive', product, variant })}
-                          >
-                            Receive
                           </button>
                           {status !== 'ok' && (
                             <button
