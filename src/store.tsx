@@ -22,6 +22,7 @@ import {
 } from './inventory'
 import {
   createBuyerPurchase,
+  importBuyer,
   removeBuyer,
   setOrderStatus,
   updateBuyer,
@@ -61,6 +62,7 @@ type MarketApi = {
   saveOffer: (input: OfferInput, offerId: string | null) => ActionResult
   removeOffer: (offerId: string) => ActionResult
   saveSeller: (input: SellerProfile) => ActionResult
+  importBuyer: (input: BuyerInput) => ActionResult
   resetDemo: () => void
 }
 
@@ -329,6 +331,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         commit(upsertOffer(stateRef.current ?? state, input, offerId), offerId ? 'Offer updated.' : 'Offer added.'),
       removeOffer: (offerId) => commit(deleteOffer(stateRef.current ?? state, offerId), 'Offer removed.'),
       saveSeller: (input) => commit(updateSeller(stateRef.current ?? state, input), 'Seller info saved.'),
+      importBuyer: (input) => commit(importBuyer(stateRef.current ?? state, input, now()), 'Buyer imported.'),
       resetDemo: () => {
         const fresh = seedState()
         const seller = stateRef.current?.seller

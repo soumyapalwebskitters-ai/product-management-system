@@ -160,6 +160,19 @@ export function updateBuyer(state: State, buyerId: string, input: BuyerInput, no
   return { ok: true, state: next }
 }
 
+export function importBuyer(state: State, input: BuyerInput, now: string): Outcome {
+  const name = clean(input.name, 80)
+  if (!name) return fail('Buyer name is required.')
+  const next = structuredClone(state)
+  const existing = next.buyers.find((buyer) => buyer.phone && buyer.phone === clean(input.phone, 30))
+  if (existing) {
+    existing.name = name; existing.address = clean(input.address ?? '', 400); existing.note = clean(input.note, 300); existing.updatedAt = now
+  } else {
+    next.buyers.push({ id: `buyer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name, phone: clean(input.phone, 30), address: clean(input.address ?? '', 400), note: clean(input.note, 300), createdAt: now, updatedAt: now })
+  }
+  return { ok: true, state: next }
+}
+
 export function createBuyerPurchase(state: State, input: PurchaseInput, now: string) {
   return writePurchase(state, input.buyerId ?? null, null, input, now)
 }
