@@ -1,12 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
+import { ProductPhoto } from '../components/ProductImageField'
 import { PurchaseForm } from '../components/PurchaseForm'
 import { OrderPill, PaidTick } from '../components/Status'
 import { formatDay, paymentLabel, rupees } from '../format'
 import { buyerPayment, orderDue, paymentStandingLabel } from '../paymentStatus'
 import { matchesQuery } from '../search'
 import { useMarket } from '../store'
-import type { Buyer, CustomerOrder, State } from '../types'
+import type { Buyer, CustomerOrder, Product, State } from '../types'
 import { OrderCard } from './SalesView'
 
 export function BuyerDesk({
@@ -165,7 +166,11 @@ export function BuyerDesk({
         )}
         {preview && (
           <Dialog title={preview.name} subtitle={previewPlace(preview)} wide onClose={() => setPreviewId(null)}>
-            <BuyerDetails buyer={preview} orders={ordersFor(market.state, preview.id)} />
+            <BuyerDetails
+              buyer={preview}
+              orders={ordersFor(market.state, preview.id)}
+              products={market.state.products}
+            />
             <div className="dialog-actions">
               <button type="button" className="btn secondary" onClick={() => setPreviewId(null)}>
                 Close
@@ -428,18 +433,38 @@ function previewPlace(buyer: Buyer) {
   return [buyer.address, buyer.note].filter(Boolean).join(' · ')
 }
 
-function BuyerDetails({ buyer, orders }: { buyer: Buyer; orders: CustomerOrder[] }) {
+function BuyerDetails({
+  buyer,
+  orders,
+  products,
+}: {
+  buyer: Buyer
+  orders: CustomerOrder[]
+  products: Product[]
+}) {
   if (orders.length === 0) return <p className="hint">No purchases yet.</p>
   return (
     <div className="buyer-detail" data-testid="buyer-detail">
       {orders.map((order) => (
-        <PurchaseDetail key={order.id} buyer={buyer} order={order} />
+        <PurchaseDetail key={order.id} buyer={buyer} order={order} products={products} />
       ))}
     </div>
   )
 }
 
-function PurchaseDetail({ buyer, order }: { buyer: Buyer; order: CustomerOrder }) {
+function productImage(products: Product[], productId: string) {
+  return products.find((product) => product.id === productId)?.image ?? ''
+}
+
+function PurchaseDetail({
+  buyer,
+  order,
+  products,
+}: {
+  buyer: Buyer
+  order: CustomerOrder
+  products: Product[]
+}) {
   const discount = order.offer?.kind === 'discount' ? order.offer.amount : 0
   const due = orderDue(order)
   const settled = order.status !== 'cancelled' && due === 0
@@ -475,7 +500,12 @@ function PurchaseDetail({ buyer, order }: { buyer: Buyer; order: CustomerOrder }
                   {order.lines.map((line) => (
                     <tr key={`${line.variantId}-${line.quantity}`}>
                       <td>
-                        {line.productName} {line.variantName}
+                        <span className="item-with-photo">
+                          <ProductPhoto src={productImage(products, line.productId)} name={line.productName} />
+                          <span>
+                            {line.productName} {line.variantName}
+                          </span>
+                        </span>
                       </td>
                       <td className="num">{line.quantity}</td>
                       <td className="num">{rupees(line.unitPrice)}</td>
@@ -486,7 +516,12 @@ function PurchaseDetail({ buyer, order }: { buyer: Buyer; order: CustomerOrder }
                     order.offer.items.map((item) => (
                       <tr key={`gift-${item.variantId}`}>
                         <td>
-                          {item.productName} {item.variantName} · Gift
+                          <span className="item-with-photo">
+                            <ProductPhoto src={productImage(products, item.productId)} name={item.productName} />
+                            <span>
+                              {item.productName} {item.variantName} · Gift
+                            </span>
+                          </span>
                         </td>
                         <td className="num">{item.quantity}</td>
                         <td className="num">Gift</td>

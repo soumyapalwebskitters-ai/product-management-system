@@ -159,6 +159,7 @@ export function ProductsView() {
                 <th>Variant</th>
                 <th>SKU</th>
                 <th className="num">Unit price</th>
+                <th className="num">Buying price</th>
                 <th className="num">Per box</th>
                 <th className="num">Box price</th>
                 <th className="num">Current</th>
@@ -193,6 +194,7 @@ export function ProductsView() {
                       {index === 0 && (
                         <td className="product-cell" rowSpan={variants.length}>
                           <strong>{product.name}</strong>
+                          {product.note && <div className="pending">{product.note}</div>}
                           <div className="row-actions">
                             <button type="button" className="btn secondary small" onClick={() => setEditing(product)}>
                               Edit
@@ -213,6 +215,7 @@ export function ProductsView() {
                       </td>
                       <td className="sku">{variant.sku}</td>
                       <td className="num">{rupees(variant.price)}</td>
+                      <td className="num">{rupees(variant.buyingPrice ?? 0)}</td>
                       <td className="num">{variant.itemsPerBox.toLocaleString()}</td>
                       <td className="num">{rupees(boxPrice)}</td>
                       <td className="num">

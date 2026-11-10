@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 type DialogProps = {
   title: string
@@ -20,14 +20,17 @@ export function Dialog({
   children,
 }: DialogProps) {
   const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        if (document.querySelector('.picker-trigger[aria-expanded="true"]')) return
-        event.preventDefault()
-        onClose()
-      }
+      if (event.key !== 'Escape') return
+      if (document.querySelector('.picker-trigger[aria-expanded="true"]')) return
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const top = dialogs[dialogs.length - 1]
+      if (panelRef.current && top !== panelRef.current) return
+      event.preventDefault()
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -45,6 +48,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        ref={panelRef}
       >
         <header className="dialog-head">
           <div>

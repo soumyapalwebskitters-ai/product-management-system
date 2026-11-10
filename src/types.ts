@@ -4,6 +4,8 @@ export type Variant = {
   sku: string
   itemsPerBox: number
   price: number
+  /** What the shop pays for one item. */
+  buyingPrice?: number
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -12,6 +14,9 @@ export type Variant = {
 export type Product = {
   id: string
   name: string
+  /** Cropped product photo, as a JPEG data URL. */
+  image?: string
+  note?: string
   variants: Variant[]
   createdAt: string
   updatedAt: string
@@ -23,6 +28,7 @@ export type VariantInput = {
   sku: string
   itemsPerBox: number
   price?: number
+  buyingPrice?: number
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -30,6 +36,8 @@ export type VariantInput = {
 
 export type ProductInput = {
   name: string
+  image?: string
+  note?: string
   variants: VariantInput[]
 }
 
@@ -157,6 +165,19 @@ export type Offer = {
   quantity: number
 }
 
+export type SellerProfile = {
+  name: string
+  address: string
+  gst: string
+  businessName: string
+  profileImage?: string
+  logo?: string
+  facebook: string
+  instagram: string
+  youtube: string
+  whatsapp: string
+}
+
 export type State = {
   products: Product[]
   purchases: Purchase[]
@@ -164,4 +185,5 @@ export type State = {
   buyers: Buyer[]
   orders: CustomerOrder[]
   offers: Offer[]
+  seller?: SellerProfile
 }

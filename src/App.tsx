@@ -8,10 +8,13 @@ import { NeedToBuyView } from './views/NeedToBuyView'
 import { OffersView } from './views/OffersView'
 import { ProductsView } from './views/ProductsView'
 import { RecentView } from './views/RecentView'
+import { AccountsView } from './views/AccountsView'
+import { DeliveryView } from './views/DeliveryView'
 import { SalesView } from './views/SalesView'
+import { SellerInfoView } from './views/SellerInfoView'
 
 type Role = 'seller' | 'buyer'
-type SellerView = 'products' | 'buy' | 'sales' | 'recent' | 'offers' | 'suppliers'
+type SellerView = 'products' | 'buy' | 'sales' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile'
 
 type Route =
   | { role: 'seller'; view: SellerView }
@@ -22,9 +25,12 @@ const sellerLinks: Array<{ id: SellerView; label: string }> = [
   { id: 'products', label: 'All products' },
   { id: 'buy', label: 'Need to buy' },
   { id: 'sales', label: 'Sell history' },
+  { id: 'delivery', label: 'Delivery' },
+  { id: 'accounts', label: 'Accounts' },
   { id: 'recent', label: 'Last added' },
   { id: 'offers', label: 'Offers' },
   { id: 'suppliers', label: 'Supplier orders' },
+  { id: 'profile', label: 'Seller info' },
 ]
 
 function readRoute(): Route {
@@ -36,9 +42,12 @@ function readRoute(): Route {
   const view = parts[0] === 'seller' ? parts[1] : parts[0]
   if (view === 'buy') return { role: 'seller', view: 'buy' }
   if (view === 'sales') return { role: 'seller', view: 'sales' }
+  if (view === 'delivery') return { role: 'seller', view: 'delivery' }
+  if (view === 'accounts') return { role: 'seller', view: 'accounts' }
   if (view === 'recent') return { role: 'seller', view: 'recent' }
   if (view === 'offers') return { role: 'seller', view: 'offers' }
   if (view === 'suppliers' || view === 'history') return { role: 'seller', view: 'suppliers' }
+  if (view === 'profile') return { role: 'seller', view: 'profile' }
   return { role: 'seller', view: 'products' }
 }
 
@@ -163,9 +172,12 @@ export function App() {
         {route.role === 'seller' && route.view === 'products' && <ProductsView />}
         {route.role === 'seller' && route.view === 'buy' && <NeedToBuyView />}
         {route.role === 'seller' && route.view === 'sales' && <SalesView />}
+        {route.role === 'seller' && route.view === 'delivery' && <DeliveryView />}
+        {route.role === 'seller' && route.view === 'accounts' && <AccountsView />}
         {route.role === 'seller' && route.view === 'recent' && <RecentView />}
         {route.role === 'seller' && route.view === 'offers' && <OffersView editable />}
         {route.role === 'seller' && route.view === 'suppliers' && <HistoryView />}
+        {route.role === 'seller' && route.view === 'profile' && <SellerInfoView />}
         {route.role === 'buyer' && route.view === 'buyers' && (
           <BuyerDesk
             buyerId={route.buyerId}
@@ -174,16 +186,16 @@ export function App() {
         )}
         {route.role === 'buyer' && route.view === 'offers' && <OffersView editable={false} />}
         <footer className="footer">
-          <p>
-            {role === 'seller'
-              ? 'Stock, purchases, buyers, and offers are saved in this browser.'
-              : 'Purchases, buyers, and offers are saved in this browser.'}
-          </p>
+          <p>Saved in the shop database.</p>
           <button type="button" className="btn secondary small" onClick={() => setConfirmReset(true)}>
             Restore sample data
           </button>
         </footer>
       </main>
+      <footer className="site-footer">
+        <p>Developer: Soumya Pal</p>
+        <p>Business owner: Rupsa Datta</p>
+      </footer>
 
       {confirmReset && (
         <ConfirmDialog

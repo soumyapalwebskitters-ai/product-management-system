@@ -26,30 +26,13 @@ import {
   setOrderStatus,
   updateBuyer,
   updatePurchase,
-  withOrderNumbers,
   type PurchaseInput as BuyerPurchaseInput,
 } from './orders'
 import { deleteOffer, upsertOffer, type OfferInput } from './offers'
+import { ensureState, isCatalog, isRecord, isState } from './parseState'
 import { demoOffers, seedState } from './seed'
-import type {
-  Buyer,
-  CustomerOrder,
-  GiftLine,
-  Movement,
-  MovementType,
-  Offer,
-  OrderLine,
-  OrderStatus,
-  PaymentMethod,
-  Product,
-  ProductInput,
-  Purchase,
-  PurchaseInput,
-  PurchaseStatus,
-  RecordedOffer,
-  State,
-  Variant,
-} from './types'
+import { updateSeller } from './seller'
+import type { OrderStatus, ProductInput, PurchaseInput, SellerProfile, State } from './types'
 import type { BuyerInput } from './orders'
 
 const STORAGE_KEY = 'market.productManagement.v2'
@@ -77,254 +60,18 @@ type MarketApi = {
   deleteBuyer: (buyerId: string) => ActionResult
   saveOffer: (input: OfferInput, offerId: string | null) => ActionResult
   removeOffer: (offerId: string) => ActionResult
+  saveSeller: (input: SellerProfile) => ActionResult
   resetDemo: () => void
 }
 
+type ShopPayload = { revision: number; state: State; fresh: boolean }
+
+type SaveResult =
+  | { ok: true; revision: number }
+  | { ok: false; conflict: ShopPayload }
+  | { ok: false; error: string }
+
 const MarketContext = createContext<MarketApi | null>(null)
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function isInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value)
-}
-
-function isVariant(value: unknown): value is Variant {
-  if (!isRecord(value)) return false
-  return (
-    typeof value.id === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.sku === 'string' &&
-    isInteger(value.itemsPerBox) &&
-    (value.price === undefined || isInteger(value.price)) &&
-    isInteger(value.currentStock) &&
-    isInteger(value.minimumStock) &&
-    isInteger(value.desiredStock)
-  )
-}
-
-function isProduct(value: unknown): value is Product {
-  if (!isRecord(value) || !Array.isArray(value.variants)) return false
-  return (
-    typeof value.id === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.createdAt === 'string' &&
-    typeof value.updatedAt === 'string' &&
-    value.variants.every(isVariant)
-  )
-}
-
-function isPurchase(value: unknown): value is Purchase {
-  if (!isRecord(value)) return false
-  const status = value.status
-  const validStatus: PurchaseStatus[] = ['ordered', 'partial', 'received']
-  return (
-    typeof value.id === 'string' &&
-    typeof value.productId === 'string' &&
-    typeof value.variantId === 'string' &&
-    typeof value.productName === 'string' &&
-    typeof value.variantName === 'string' &&
-    typeof value.sku === 'string' &&
-    isInteger(value.itemsPerBox) &&
-    isInteger(value.boxes) &&
-    isInteger(value.orderedItems) &&
-    isInteger(value.receivedItems) &&
-    typeof status === 'string' &&
-    validStatus.includes(status as PurchaseStatus) &&
-    typeof value.note === 'string' &&
-    typeof value.createdAt === 'string' &&
-    typeof value.updatedAt === 'string'
-  )
-}
-
-function isMovement(value: unknown): value is Movement {
-  if (!isRecord(value)) return false
-  const types: MovementType[] = ['sale', 'adjustment', 'receipt', 'purchase']
-  return (
-    typeof value.id === 'string' &&
-    typeof value.type === 'string' &&
-    types.includes(value.type as MovementType) &&
-    typeof value.productId === 'string' &&
-    typeof value.variantId === 'string' &&
-    typeof value.productName === 'string' &&
-    typeof value.variantName === 'string' &&
-    typeof value.sku === 'string' &&
-    isInteger(value.delta) &&
-    isInteger(value.previousStock) &&
-    isInteger(value.newStock) &&
-    typeof value.note === 'string' &&
-    typeof value.createdAt === 'string' &&
-    (value.purchaseId === undefined || typeof value.purchaseId === 'string')
-  )
-}
-
-function isBuyer(value: unknown): value is Buyer {
-  if (!isRecord(value)) return false
-  return (
-    typeof value.id === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.phone === 'string' &&
-    (value.address === undefined || typeof value.address === 'string') &&
-    typeof value.note === 'string' &&
-    typeof value.createdAt === 'string' &&
-    typeof value.updatedAt === 'string'
-  )
-}
-
-function isOrderLine(value: unknown): value is OrderLine {
-  if (!isRecord(value)) return false
-  return (
-    typeof value.productId === 'string' &&
-    typeof value.variantId === 'string' &&
-    typeof value.productName === 'string' &&
-    typeof value.variantName === 'string' &&
-    typeof value.sku === 'string' &&
-    isInteger(value.quantity) &&
-    isInteger(value.unitPrice)
-  )
-}
-
-function isGiftLine(value: unknown): value is GiftLine {
-  if (!isRecord(value)) return false
-  return (
-    typeof value.productId === 'string' &&
-    typeof value.variantId === 'string' &&
-    typeof value.productName === 'string' &&
-    typeof value.variantName === 'string' &&
-    typeof value.sku === 'string' &&
-    isInteger(value.quantity)
-  )
-}
-
-function isRecordedOffer(value: unknown): value is RecordedOffer {
-  if (!isRecord(value)) return false
-  if (value.kind === 'discount') {
-    return (
-      typeof value.offerId === 'string' &&
-      typeof value.offerName === 'string' &&
-      isInteger(value.percent) &&
-      isInteger(value.amount)
-    )
-  }
-  if (value.kind === 'gift') {
-    return (
-      typeof value.offerId === 'string' &&
-      typeof value.offerName === 'string' &&
-      Array.isArray(value.items) &&
-      value.items.every(isGiftLine)
-    )
-  }
-  return false
-}
-
-function isCustomerOrder(value: unknown): value is CustomerOrder {
-  if (!isRecord(value) || !Array.isArray(value.lines)) return false
-  const statuses: OrderStatus[] = ['placed', 'delivered', 'cancelled']
-  const methods: PaymentMethod[] = ['cash', 'upi', 'card', 'bank']
-  return (
-    typeof value.id === 'string' &&
-    (value.number === undefined || typeof value.number === 'string') &&
-    typeof value.buyerId === 'string' &&
-    typeof value.buyerName === 'string' &&
-    typeof value.status === 'string' &&
-    statuses.includes(value.status as OrderStatus) &&
-    value.lines.every(isOrderLine) &&
-    isInteger(value.subtotal) &&
-    (value.offer === null || isRecordedOffer(value.offer)) &&
-    isInteger(value.total) &&
-    (value.paymentMethod === undefined || methods.includes(value.paymentMethod as PaymentMethod)) &&
-    (value.paid === undefined || (isInteger(value.paid) && (value.paid as number) >= 0)) &&
-    typeof value.comment === 'string' &&
-    typeof value.createdAt === 'string' &&
-    typeof value.updatedAt === 'string'
-  )
-}
-
-function isOffer(value: unknown): value is Offer {
-  if (!isRecord(value)) return false
-  return (
-    typeof value.id === 'string' &&
-    typeof value.name === 'string' &&
-    isInteger(value.minimumAmount) &&
-    (value.reward === 'discount' || value.reward === 'gift') &&
-    isInteger(value.percent) &&
-    typeof value.productId === 'string' &&
-    typeof value.variantId === 'string' &&
-    isInteger(value.quantity)
-  )
-}
-
-function isCatalog(value: Record<string, unknown>) {
-  return (
-    Array.isArray(value.products) &&
-    value.products.every(isProduct) &&
-    Array.isArray(value.purchases) &&
-    value.purchases.every(isPurchase) &&
-    Array.isArray(value.movements) &&
-    value.movements.every(isMovement)
-  )
-}
-
-function isState(value: unknown): value is State {
-  if (!isRecord(value) || !isCatalog(value)) return false
-  return (
-    Array.isArray(value.buyers) &&
-    value.buyers.every(isBuyer) &&
-    Array.isArray(value.orders) &&
-    value.orders.every(isCustomerOrder) &&
-    Array.isArray(value.offers) &&
-    value.offers.every(isOffer)
-  )
-}
-
-const knownPrices: Record<string, number> = {
-  'FP-S': 30,
-  'FP-M': 55,
-  'FP-L': 90,
-  'RK-SS': 20,
-  'RK-MS': 80,
-  'SP-10': 40,
-  'SP-7': 12,
-}
-
-function pricedProducts(products: Product[]) {
-  return products.map((product) => ({
-    ...product,
-    variants: product.variants.map((variant) => ({
-      ...variant,
-      price: variant.price ?? knownPrices[variant.sku] ?? 0,
-    })),
-  }))
-}
-
-function ensureState(state: State): State {
-  return {
-    ...state,
-    products: pricedProducts(state.products),
-    buyers: state.buyers.map((buyer) => ({ ...buyer, address: buyer.address ?? '' })),
-    orders: withOrderNumbers(
-      state.orders.map((order) => ({
-        ...order,
-        paymentMethod: order.paymentMethod ?? 'cash',
-        paid: order.paid ?? 0,
-      })),
-    ),
-  }
-}
-
-function withPrices(state: Pick<State, 'products' | 'purchases' | 'movements'>): State {
-  const products = pricedProducts(state.products)
-  const giftReady = products.some((product) => product.variants.some((variant) => variant.id === 'var-sp-10'))
-  return {
-    products,
-    purchases: state.purchases,
-    movements: state.movements,
-    buyers: [],
-    orders: [],
-    offers: giftReady ? demoOffers() : [],
-  }
-}
 
 function readStored(key: string): unknown {
   const raw = localStorage.getItem(key)
@@ -332,7 +79,19 @@ function readStored(key: string): unknown {
   return JSON.parse(raw) as unknown
 }
 
-function loadState(): State {
+function withPrices(state: Pick<State, 'products' | 'purchases' | 'movements'>): State {
+  const giftReady = state.products.some((product) => product.variants.some((variant) => variant.id === 'var-sp-10'))
+  return ensureState({
+    products: state.products,
+    purchases: state.purchases,
+    movements: state.movements,
+    buyers: [],
+    orders: [],
+    offers: giftReady ? demoOffers() : [],
+  })
+}
+
+function readBrowserState(): State | null {
   try {
     const current = readStored(STORAGE_KEY)
     if (isRecord(current) && current.version === 2 && isState(current.state)) return ensureState(current.state)
@@ -340,35 +99,184 @@ function loadState(): State {
     if (isRecord(legacy) && legacy.version === 1 && isRecord(legacy.state) && isCatalog(legacy.state)) {
       return withPrices(legacy.state as Pick<State, 'products' | 'purchases' | 'movements'>)
     }
-    return seedState()
+    return null
   } catch {
-    return seedState()
+    return null
   }
 }
 
-export function MarketProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState(loadState)
-  const [notice, setNotice] = useState<string | null>(null)
-  const stateRef = useRef(state)
-  stateRef.current = state
+function parsePayload(value: unknown): ShopPayload | null {
+  if (!isRecord(value) || typeof value.revision !== 'number' || !Number.isInteger(value.revision)) return null
+  if (!isState(value.state)) return null
+  return { revision: value.revision, state: value.state, fresh: value.fresh === true }
+}
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, state }))
-    } catch {
-      // Ignore private-mode and quota failures. The screen still works for this visit.
-    }
-  }, [state])
+async function errorMessage(body: unknown, fallback: string) {
+  if (isRecord(body) && typeof body.error === 'string') return body.error
+  return fallback
+}
+
+async function saveShop(revision: number, state: State): Promise<SaveResult> {
+  let response: Response
+  try {
+    response = await fetch('/api/state', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ revision, state }),
+      cache: 'no-store',
+    })
+  } catch {
+    return { ok: false, error: 'Could not reach the shop database.' }
+  }
+  let body: unknown = null
+  try {
+    body = await response.json()
+  } catch {
+    body = null
+  }
+  if (response.status === 409) {
+    const conflict = parsePayload(body)
+    if (!conflict) return { ok: false, error: 'The shop changed, and the latest copy could not be read.' }
+    return { ok: false, conflict }
+  }
+  if (!response.ok) return { ok: false, error: await errorMessage(body, 'Could not save to D1.') }
+  if (!isRecord(body) || typeof body.revision !== 'number' || !Number.isInteger(body.revision)) {
+    return { ok: false, error: 'D1 saved, but the reply was not valid.' }
+  }
+  return { ok: true, revision: body.revision }
+}
+
+let shopLoad: Promise<{ state: State; revision: number }> | null = null
+
+function loadShop() {
+  shopLoad ??= fetchShop().catch((error: unknown) => {
+    shopLoad = null
+    throw error
+  })
+  return shopLoad
+}
+
+async function fetchShop() {
+  let response: Response
+  try {
+    response = await fetch('/api/state', { cache: 'no-store' })
+  } catch {
+    throw new Error('Could not reach the shop database.')
+  }
+  let body: unknown = null
+  try {
+    body = await response.json()
+  } catch {
+    body = null
+  }
+  if (!response.ok) throw new Error(await errorMessage(body, 'Could not load the shop from D1.'))
+  const payload = parsePayload(body)
+  if (!payload) throw new Error('The shop data was not valid.')
+  if (!payload.fresh) return { state: ensureState(payload.state), revision: payload.revision }
+
+  const local = readBrowserState()
+  const next = local ?? ensureState(payload.state)
+  const saved = await saveShop(0, next)
+  if (!saved.ok) {
+    if ('conflict' in saved) return { state: ensureState(saved.conflict.state), revision: saved.conflict.revision }
+    throw new Error(saved.error)
+  }
+  if (local) {
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(LEGACY_KEY)
+  }
+  return { state: next, revision: saved.revision }
+}
+
+function Boot({
+  title,
+  body,
+  action,
+}: {
+  title: string
+  body: string
+  action?: { label: string; onClick: () => void }
+}) {
+  return (
+    <div className="boot" data-testid="boot">
+      <p className="wordmark">Market</p>
+      <h1>{title}</h1>
+      <p>{body}</p>
+      {action && (
+        <button type="button" className="btn secondary" data-testid="boot-retry" onClick={action.onClick}>
+          {action.label}
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function MarketProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<State | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [bootError, setBootError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const stateRef = useRef<State | null>(null)
+  const revisionRef = useRef(0)
+  const generationRef = useRef(0)
+  const chainRef = useRef(Promise.resolve())
 
   const dismissNotice = useCallback(() => setNotice(null), [])
 
-  const api = useMemo<MarketApi>(() => {
+  useEffect(() => {
+    let cancelled = false
+    loadShop()
+      .then((loaded) => {
+        if (cancelled) return
+        stateRef.current = loaded.state
+        revisionRef.current = loaded.revision
+        setState(loaded.state)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setBootError(error instanceof Error ? error.message : 'Could not load the shop.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [attempt])
+
+  const persist = useCallback((next: State) => {
+    const generation = generationRef.current
+    chainRef.current = chainRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (generation !== generationRef.current) return
+        let result = await saveShop(revisionRef.current, next)
+        if (generation !== generationRef.current) return
+        if (!result.ok && !('conflict' in result)) result = await saveShop(revisionRef.current, next)
+        if (generation !== generationRef.current) return
+        if (result.ok) {
+          revisionRef.current = result.revision
+          return
+        }
+        if ('conflict' in result) {
+          generationRef.current += 1
+          revisionRef.current = result.conflict.revision
+          const latest = ensureState(result.conflict.state)
+          stateRef.current = latest
+          setState(latest)
+          setNotice('The shop was saved somewhere else. Loaded the latest copy.')
+          return
+        }
+        setNotice(result.error)
+      })
+  }, [])
+
+  const api = useMemo<MarketApi | null>(() => {
+    if (!state) return null
     const now = () => new Date().toISOString()
     function commit(result: Outcome, message: string): ActionResult {
       if (!result.ok) return result
       stateRef.current = result.state
       setState(result.state)
       setNotice(message)
+      persist(result.state)
       return { ok: true }
     }
 
@@ -376,62 +284,80 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       state,
       notice,
       dismissNotice,
-      addProduct: (input) => commit(createProduct(stateRef.current, input, now()), 'Product added.'),
+      addProduct: (input) => commit(createProduct(stateRef.current ?? state, input, now()), 'Product added.'),
       updateProduct: (id, input) =>
-        commit(updateProduct(stateRef.current, id, input, now()), 'Product updated.'),
-      deleteProduct: (id) => commit(deleteProduct(stateRef.current, id), 'Product deleted.'),
+        commit(updateProduct(stateRef.current ?? state, id, input, now()), 'Product updated.'),
+      deleteProduct: (id) => commit(deleteProduct(stateRef.current ?? state, id), 'Product deleted.'),
       setDesired: (productId, variantId, desired) =>
         commit(
-          setDesiredStock(stateRef.current, productId, variantId, desired, now()),
+          setDesiredStock(stateRef.current ?? state, productId, variantId, desired, now()),
           'Desired stock updated.',
         ),
       sell: (productId, variantId, quantity, note) =>
-        commit(recordSale(stateRef.current, productId, variantId, quantity, note, now()), 'Sale recorded.'),
+        commit(recordSale(stateRef.current ?? state, productId, variantId, quantity, note, now()), 'Sale recorded.'),
       adjust: (productId, variantId, stock, note) =>
-        commit(
-          setStock(stateRef.current, productId, variantId, stock, note, now()),
-          'Stock adjusted.',
-        ),
+        commit(setStock(stateRef.current ?? state, productId, variantId, stock, note, now()), 'Stock adjusted.'),
       receive: (productId, variantId, quantity, note) =>
         commit(
-          receiveStock(stateRef.current, productId, variantId, quantity, note, now()),
+          receiveStock(stateRef.current ?? state, productId, variantId, quantity, note, now()),
           'Stock received.',
         ),
       purchase: (input) =>
         commit(
-          recordPurchase(stateRef.current, input, now()),
+          recordPurchase(stateRef.current ?? state, input, now()),
           input.receiveNow ? 'Purchase added to stock.' : 'Purchase recorded. Stock updates when it arrives.',
         ),
       receiveOrder: (purchaseId, items, note) =>
-        commit(receivePurchase(stateRef.current, purchaseId, items, note, now()), 'Delivery added to stock.'),
+        commit(receivePurchase(stateRef.current ?? state, purchaseId, items, note, now()), 'Delivery added to stock.'),
       saveBuyerPurchase: (input) => {
-        const result = createBuyerPurchase(stateRef.current, input, now())
+        const result = createBuyerPurchase(stateRef.current ?? state, input, now())
         if (!result.ok) return result
         stateRef.current = result.state
         setState(result.state)
         setNotice('Buyer purchase recorded.')
+        persist(result.state)
         return { ok: true, buyerId: result.buyerId }
       },
       editBuyerPurchase: (orderId, input) =>
-        commit(updatePurchase(stateRef.current, orderId, input, now()), 'Purchase updated.'),
+        commit(updatePurchase(stateRef.current ?? state, orderId, input, now()), 'Purchase updated.'),
       setDeliveryStatus: (orderId, status) =>
-        commit(setOrderStatus(stateRef.current, orderId, status, now()), 'Delivery status updated.'),
+        commit(setOrderStatus(stateRef.current ?? state, orderId, status, now()), 'Delivery status updated.'),
       editBuyer: (buyerId, input) =>
-        commit(updateBuyer(stateRef.current, buyerId, input, now()), 'Buyer updated.'),
-      deleteBuyer: (buyerId) =>
-        commit(removeBuyer(stateRef.current, buyerId, now()), 'Buyer removed.'),
+        commit(updateBuyer(stateRef.current ?? state, buyerId, input, now()), 'Buyer updated.'),
+      deleteBuyer: (buyerId) => commit(removeBuyer(stateRef.current ?? state, buyerId, now()), 'Buyer removed.'),
       saveOffer: (input, offerId) =>
-        commit(upsertOffer(stateRef.current, input, offerId), offerId ? 'Offer updated.' : 'Offer added.'),
-      removeOffer: (offerId) => commit(deleteOffer(stateRef.current, offerId), 'Offer removed.'),
+        commit(upsertOffer(stateRef.current ?? state, input, offerId), offerId ? 'Offer updated.' : 'Offer added.'),
+      removeOffer: (offerId) => commit(deleteOffer(stateRef.current ?? state, offerId), 'Offer removed.'),
+      saveSeller: (input) => commit(updateSeller(stateRef.current ?? state, input), 'Seller info saved.'),
       resetDemo: () => {
         const fresh = seedState()
+        const seller = stateRef.current?.seller
+        if (seller) fresh.seller = seller
         stateRef.current = fresh
         setState(fresh)
         setNotice('Sample catalog restored.')
+        persist(fresh)
       },
     }
-  }, [dismissNotice, notice, state])
+  }, [dismissNotice, notice, persist, state])
 
+  if (bootError) {
+    return (
+      <Boot
+        title="Could not open the shop"
+        body={bootError}
+        action={{
+          label: 'Try again',
+          onClick: () => {
+            shopLoad = null
+            setBootError(null)
+            setAttempt((value) => value + 1)
+          },
+        }}
+      />
+    )
+  }
+  if (!api) return <Boot title="Loading the shop" body="Opening the catalog from D1." />
   return <MarketContext.Provider value={api}>{children}</MarketContext.Provider>
 }
 

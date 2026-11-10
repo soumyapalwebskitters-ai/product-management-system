@@ -4,21 +4,25 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "test": "tsx --test src/purchase.test.ts src/inventory.test.ts src/search.test.ts src/offers.test.ts src/orders.test.ts src/paymentStatus.test.ts"
+    "dev": "NODE_OPTIONS='--experimental-sqlite' vite",
+    "build": "tsc --noEmit && tsc -p tsconfig.worker.json && vite build",
+    "preview": "NODE_OPTIONS='--experimental-sqlite' vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "db:apply:remote": "wrangler d1 migrations apply market --remote",
+    "test": "node --experimental-sqlite --import tsx --test src/purchase.test.ts src/inventory.test.ts src/search.test.ts src/offers.test.ts src/orders.test.ts src/paymentStatus.test.ts src/records.test.ts src/persist.test.ts"
   },
   "dependencies": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261110.1",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "wrangler": "^4.160.0"
   }
 }

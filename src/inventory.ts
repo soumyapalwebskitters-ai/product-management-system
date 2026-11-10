@@ -71,13 +71,31 @@ function purchaseStatus(ordered: number, received: number): Purchase['status'] {
   return 'received'
 }
 
+const MAX_IMAGE = 1_200_000
+
+function cleanImage(value: string | undefined, fallback: string) {
+  if (value === undefined) return { ok: true as const, image: fallback }
+  const image = value.trim()
+  if (!image) return { ok: true as const, image: '' }
+  if (!image.startsWith('data:image/') || image.length > MAX_IMAGE) {
+    return { ok: false as const, error: 'Use a cropped product photo.' }
+  }
+  return { ok: true as const, image }
+}
+
 function parseProduct(
   input: ProductInput,
   existing: Variant[] | null,
-): { ok: true; name: string; variants: VariantInput[] } | { ok: false; error: string } {
+  currentImage = '',
+  currentNote = '',
+): { ok: true; name: string; image: string; note: string; variants: VariantInput[] } | { ok: false; error: string } {
   const name = input.name.trim()
   if (!name) return fail('Enter a product name.')
   if (name.length > 80) return fail('Product name must be 80 characters or fewer.')
+  const image = cleanImage(input.image, currentImage)
+  if (!image.ok) return image
+  const note = input.note === undefined ? currentNote : input.note.trim()
+  if (note.length > 400) return fail('The note must be 400 characters or fewer.')
   if (input.variants.length === 0) return fail('Add at least one variant.')
 
   const variants: VariantInput[] = []
@@ -117,6 +135,9 @@ function parseProduct(
     const price = source.price ?? 0
     const priceError = wholeNumber(price, `Selling price for ${variantName}`, 0)
     if (priceError) return fail(priceError)
+    const buyingPrice = source.buyingPrice ?? 0
+    const buyingError = wholeNumber(buyingPrice, `Buying price for ${variantName}`, 0)
+    if (buyingError) return fail(buyingError)
 
     variants.push({
       id: source.id,
@@ -124,13 +145,14 @@ function parseProduct(
       sku,
       itemsPerBox: source.itemsPerBox,
       price,
+      buyingPrice,
       currentStock: source.currentStock,
       minimumStock: source.minimumStock,
       desiredStock: source.desiredStock,
     })
   }
 
-  return { ok: true, name, variants }
+  return { ok: true, name, image: image.image, note, variants }
 }
 
 function skuClash(state: State, variants: VariantInput[], ignoreIds: Set<string>) {
@@ -153,6 +175,7 @@ function toVariant(input: VariantInput): Variant {
     sku: input.sku,
     itemsPerBox: input.itemsPerBox,
     price: input.price ?? 0,
+    buyingPrice: input.buyingPrice ?? 0,
     currentStock: input.currentStock,
     minimumStock: input.minimumStock,
     desiredStock: input.desiredStock,
@@ -255,6 +278,8 @@ export function createProduct(state: State, input: ProductInput, now: string): O
   const product: Product = {
     id: createId(),
     name: parsed.name,
+    image: parsed.image,
+    note: parsed.note,
     variants: parsed.variants.map(toVariant),
     createdAt: now,
     updatedAt: now,
@@ -279,7 +304,7 @@ export function updateProduct(
   const productIndex = state.products.findIndex((product) => product.id === productId)
   if (productIndex < 0) return fail('Product not found.')
   const existing = state.products[productIndex]
-  const parsed = parseProduct(input, existing.variants)
+  const parsed = parseProduct(input, existing.variants, existing.image ?? '', existing.note ?? '')
   if (!parsed.ok) return parsed
   const clash = skuClash(state, parsed.variants, new Set(existing.variants.map((variant) => variant.id)))
   if (clash) return fail(clash)
@@ -289,6 +314,8 @@ export function updateProduct(
   const product: Product = {
     ...existing,
     name: parsed.name,
+    image: parsed.image,
+    note: parsed.note,
     variants: parsed.variants.map(toVariant),
     updatedAt: now,
   }

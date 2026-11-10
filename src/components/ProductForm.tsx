@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react'
 import { boxesLabel, itemsLabel, parseWhole } from '../format'
 import { calcPurchase, needsRestock } from '../purchase'
+import { ProductImageField } from './ProductImageField'
 import type { ActionResult } from '../store'
 import type { Product, ProductInput, VariantInput } from '../types'
 
@@ -11,6 +12,7 @@ type DraftVariant = {
   sku: string
   itemsPerBox: string
   price: string
+  buyingPrice: string
   currentStock: string
   minimumStock: string
   desiredStock: string
@@ -23,10 +25,20 @@ function blankVariant(): DraftVariant {
     sku: '',
     itemsPerBox: '1',
     price: '0',
+    buyingPrice: '0',
     currentStock: '0',
     minimumStock: '',
     desiredStock: '',
   }
+}
+
+function priceFromBuying(buyingPrice: string): Partial<DraftVariant> {
+  const buying = parseWhole(buyingPrice)
+  if (buying !== null && Number.isSafeInteger(buying * 2)) {
+    return { buyingPrice, price: String(buying * 2) }
+  }
+  if (buyingPrice.trim() === '') return { buyingPrice, price: '' }
+  return { buyingPrice }
 }
 
 function fromProduct(product: Product): DraftVariant[] {
@@ -37,6 +49,7 @@ function fromProduct(product: Product): DraftVariant[] {
     sku: variant.sku,
     itemsPerBox: String(variant.itemsPerBox),
     price: String(variant.price),
+    buyingPrice: String(variant.buyingPrice ?? 0),
     currentStock: String(variant.currentStock),
     minimumStock: String(variant.minimumStock),
     desiredStock: String(variant.desiredStock),
@@ -56,6 +69,8 @@ export function ProductForm({
 }) {
   const formId = useId()
   const [name, setName] = useState(product?.name ?? '')
+  const [image, setImage] = useState(product?.image ?? '')
+  const [note, setNote] = useState(product?.note ?? '')
   const [variants, setVariants] = useState<DraftVariant[]>(
     product ? fromProduct(product) : [blankVariant()],
   )
@@ -69,7 +84,7 @@ export function ProductForm({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    const built = buildInput(name, variants)
+    const built = buildInput(name, variants, image, note)
     if (!built.ok) {
       setError(built.error)
       return
@@ -85,21 +100,31 @@ export function ProductForm({
           {error}
         </p>
       )}
-      <label className="field" htmlFor={`${formId}-name`}>
-        <span>Product name</span>
-        <input
-          id={`${formId}-name`}
-          value={name}
-          autoFocus
-          autoComplete="off"
-          placeholder="Flower Pots"
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <p className="hint">
-        A product groups variants such as sizes or pack types. Each variant keeps its own SKU, box
-        size, and stock levels.
-      </p>
+      <section className="form-group">
+        <h3 className="section-label">Product</h3>
+        <label className="field" htmlFor={`${formId}-name`}>
+          <span>Product name</span>
+          <input
+            id={`${formId}-name`}
+            value={name}
+            autoFocus
+            autoComplete="off"
+            placeholder="Flower Pots"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <ProductImageField image={image} onChange={setImage} />
+        <label className="field" htmlFor={`${formId}-note`}>
+          <span>Note</span>
+          <textarea
+            id={`${formId}-note`}
+            value={note}
+            rows={3}
+            placeholder="Pack size, supplier, or anything to remember"
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </label>
+      </section>
 
       <div className="variant-editor">
         {variants.map((variant, index) => (
@@ -172,7 +197,9 @@ function VariantCard({
           Remove
         </button>
       </header>
-      <div className="fields">
+      <section className="form-group">
+        <h4 className="section-label">Details</h4>
+        <div className="fields">
         <label className="field" htmlFor={`${formId}-${variant.key}-name`}>
           <span>Variant name</span>
           <input
@@ -194,39 +221,55 @@ function VariantCard({
             onChange={(event) => onChange({ sku: event.target.value })}
           />
         </label>
-      </div>
-      <div className="metrics">
-        <NumberField
-          id={`${formId}-${variant.key}-box`}
-          label="Items per box"
-          value={variant.itemsPerBox}
-          onChange={(itemsPerBox) => onChange({ itemsPerBox })}
-        />
-        <NumberField
-          id={`${formId}-${variant.key}-price`}
-          label="Selling price ₹"
-          value={variant.price}
-          onChange={(price) => onChange({ price })}
-        />
-        <NumberField
-          id={`${formId}-${variant.key}-stock`}
-          label="Current stock"
-          value={variant.currentStock}
-          onChange={(currentStock) => onChange({ currentStock })}
-        />
-        <NumberField
-          id={`${formId}-${variant.key}-min`}
-          label="Minimum stock"
-          value={variant.minimumStock}
-          onChange={(minimumStock) => onChange({ minimumStock })}
-        />
-        <NumberField
-          id={`${formId}-${variant.key}-desired`}
-          label="Desired stock"
-          value={variant.desiredStock}
-          onChange={(desiredStock) => onChange({ desiredStock })}
-        />
-      </div>
+        </div>
+      </section>
+      <section className="form-group">
+        <h4 className="section-label">Price</h4>
+        <div className="fields">
+          <NumberField
+            id={`${formId}-${variant.key}-buying`}
+            label="Buying price ₹"
+            value={variant.buyingPrice}
+            onChange={(buyingPrice) => onChange(priceFromBuying(buyingPrice))}
+          />
+          <NumberField
+            id={`${formId}-${variant.key}-price`}
+            label="Selling price ₹"
+            value={variant.price}
+            onChange={(price) => onChange({ price })}
+          />
+        </div>
+        <p className="hint">Selling price starts at twice the buying price. You can change it.</p>
+      </section>
+      <section className="form-group">
+        <h4 className="section-label">Stock</h4>
+        <div className="metrics stock-fields">
+          <NumberField
+            id={`${formId}-${variant.key}-box`}
+            label="Items per box"
+            value={variant.itemsPerBox}
+            onChange={(itemsPerBox) => onChange({ itemsPerBox })}
+          />
+          <NumberField
+            id={`${formId}-${variant.key}-stock`}
+            label="Current stock"
+            value={variant.currentStock}
+            onChange={(currentStock) => onChange({ currentStock })}
+          />
+          <NumberField
+            id={`${formId}-${variant.key}-min`}
+            label="Minimum stock"
+            value={variant.minimumStock}
+            onChange={(minimumStock) => onChange({ minimumStock })}
+          />
+          <NumberField
+            id={`${formId}-${variant.key}-desired`}
+            label="Desired stock"
+            value={variant.desiredStock}
+            onChange={(desiredStock) => onChange({ desiredStock })}
+          />
+        </div>
+      </section>
       {minimum === 0 && (
         <p className="hint">A minimum of 0 keeps this variant off the purchase list.</p>
       )}
@@ -277,6 +320,8 @@ function NumberField({
 function buildInput(
   name: string,
   variants: DraftVariant[],
+  image: string,
+  note: string,
 ): { ok: true; input: ProductInput } | { ok: false; error: string } {
   if (!name.trim()) return { ok: false, error: 'Enter a product name.' }
   if (variants.length === 0) return { ok: false, error: 'Add at least one variant.' }
@@ -291,12 +336,14 @@ function buildInput(
 
     const itemsPerBox = parseWhole(variant.itemsPerBox)
     const price = parseWhole(variant.price)
+    const buyingPrice = parseWhole(variant.buyingPrice)
     const currentStock = parseWhole(variant.currentStock)
     const minimumStock = parseWhole(variant.minimumStock)
     const desiredStock = parseWhole(variant.desiredStock)
     if (itemsPerBox === null) return { ok: false, error: `Enter items per box for ${variantName}.` }
     if (itemsPerBox < 1) return { ok: false, error: `${variantName} needs at least 1 item per box.` }
     if (price === null) return { ok: false, error: `Enter a selling price for ${variantName}.` }
+    if (buyingPrice === null) return { ok: false, error: `Enter a buying price for ${variantName}.` }
     if (currentStock === null) return { ok: false, error: `Enter the current stock for ${variantName}.` }
     if (minimumStock === null) return { ok: false, error: `Enter a minimum stock for ${variantName}.` }
     if (desiredStock === null) return { ok: false, error: `Enter a desired stock for ${variantName}.` }
@@ -307,11 +354,12 @@ function buildInput(
       sku,
       itemsPerBox,
       price,
+      buyingPrice,
       currentStock,
       minimumStock,
       desiredStock,
     })
   }
 
-  return { ok: true, input: { name: name.trim(), variants: parsed } }
+  return { ok: true, input: { name: name.trim(), image, note: note.trim(), variants: parsed } }
 }
