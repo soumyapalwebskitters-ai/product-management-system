@@ -294,6 +294,7 @@ export function ProductsView() {
       {creating && (
         <Dialog title="Add product" onClose={() => setCreating(false)} wide closeOnBackdrop={false}>
           <ProductForm
+            knownSkus={state.products.flatMap((item) => item.variants.map((variant) => variant.sku))}
             submitLabel="Save product"
             onCancel={() => setCreating(false)}
             onSubmit={(input) => {
@@ -315,6 +316,7 @@ export function ProductsView() {
         >
           <ProductForm
             product={editing}
+            knownSkus={state.products.filter((item) => item.id !== editing.id).flatMap((item) => item.variants.map((variant) => variant.sku))}
             submitLabel="Save changes"
             onCancel={() => setEditing(null)}
             onSubmit={(input) => {

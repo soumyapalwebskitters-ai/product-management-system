@@ -18,11 +18,11 @@ type DraftVariant = {
   desiredStock: string
 }
 
-function blankVariant(): DraftVariant {
+function blankVariant(usedSkus: Set<string>): DraftVariant {
   return {
     key: crypto.randomUUID(),
     name: '',
-    sku: '',
+    sku: generateSku(usedSkus),
     itemsPerBox: '1',
     price: '0',
     buyingPrice: '0',
@@ -30,6 +30,14 @@ function blankVariant(): DraftVariant {
     minimumStock: '',
     desiredStock: '',
   }
+}
+
+function generateSku(usedSkus: Set<string>) {
+  let sku: string
+  do {
+    sku = `PRD-${crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`
+  } while (usedSkus.has(sku.toLowerCase()))
+  return sku
 }
 
 function priceFromBuying(buyingPrice: string): Partial<DraftVariant> {
@@ -58,11 +66,13 @@ function fromProduct(product: Product): DraftVariant[] {
 
 export function ProductForm({
   product,
+  knownSkus,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
   product?: Product
+  knownSkus: string[]
   submitLabel: string
   onSubmit: (input: ProductInput) => ActionResult
   onCancel: () => void
@@ -72,7 +82,7 @@ export function ProductForm({
   const [image, setImage] = useState(product?.image ?? '')
   const [note, setNote] = useState(product?.note ?? '')
   const [variants, setVariants] = useState<DraftVariant[]>(
-    product ? fromProduct(product) : [blankVariant()],
+    product ? fromProduct(product) : [blankVariant(new Set(knownSkus.map((sku) => sku.toLowerCase())))],
   )
   const [error, setError] = useState<string | null>(null)
 
@@ -143,7 +153,7 @@ export function ProductForm({
       <button
         type="button"
         className="btn secondary add-variant"
-        onClick={() => setVariants((current) => [...current, blankVariant()])}
+        onClick={() => setVariants((current) => [...current, blankVariant(new Set([...knownSkus, ...current.map((variant) => variant.sku)].map((sku) => sku.toLowerCase())))])}
       >
         Add variant
       </button>
@@ -211,7 +221,7 @@ function VariantCard({
           />
         </label>
         <label className="field" htmlFor={`${formId}-${variant.key}-sku`}>
-          <span>SKU</span>
+          <span>SKU <small className="field-note">Generated automatically</small></span>
           <input
             id={`${formId}-${variant.key}-sku`}
             value={variant.sku}
