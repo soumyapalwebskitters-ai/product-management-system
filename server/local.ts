@@ -2,7 +2,7 @@ import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { handleState } from '../src/shopApi'
-import type { Sql, SqlStatement } from '../src/sql'
+import type { Sql, SqlStatement, SqlValue } from '../src/sql'
 
 export type NodeRequest = {
   method?: string
@@ -21,12 +21,12 @@ let database: Sql | null = null
 
 function toSql(db: DatabaseSync): Sql {
   return {
-    async first<T>(sql: string) {
-      const row = db.prepare(sql).get()
+    async first<T>(sql: string, params: SqlValue[] = []) {
+      const row = db.prepare(sql).get(...params)
       return (row as T | undefined) ?? null
     },
-    async all<T>(sql: string) {
-      return db.prepare(sql).all() as T[]
+    async all<T>(sql: string, params: SqlValue[] = []) {
+      return db.prepare(sql).all(...params) as T[]
     },
     async batch(statements: SqlStatement[]) {
       db.exec('BEGIN')
