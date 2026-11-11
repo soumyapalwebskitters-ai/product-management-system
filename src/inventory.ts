@@ -238,7 +238,7 @@ export function buyRows(state: State): BuyRow[] {
         productId: product.id,
         productName: product.name,
         variant,
-        calc: calcPurchase(variant.currentStock, variant.desiredStock, variant.itemsPerBox),
+        calc: calcPurchase(variant.currentStock, variant.minimumStock, variant.itemsPerBox),
         onOrderItems: onOrderItems(state, variant.id),
         status: variant.currentStock <= 0 ? 'out' : 'low',
       })

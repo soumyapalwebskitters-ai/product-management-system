@@ -6,6 +6,7 @@ export type Variant = {
   price: number
   /** What the shop pays for one item. */
   buyingPrice?: number
+  purchaseUnit?: 'box' | 'item'
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -29,6 +30,7 @@ export type VariantInput = {
   itemsPerBox: number
   price?: number
   buyingPrice?: number
+  purchaseUnit?: 'box' | 'item'
   currentStock: number
   minimumStock: number
   desiredStock: number

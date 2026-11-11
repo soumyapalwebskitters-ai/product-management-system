@@ -39,6 +39,10 @@ export function OfferList({
               <h3>{offer.name}</h3>
               <p>{offerSummary(offer, giftLabel)}</p>
               <p className="hint">Unlocks at {rupees(offer.minimumAmount)} on the bill.</p>
+              {editable && offer.reward === 'gift' && (() => {
+                const variant = state.products.find((item) => item.id === offer.productId)?.variants.find((item) => item.id === offer.variantId)
+                return variant ? <p className="hint">Seller only: cost {rupees((variant.buyingPrice ?? 0) * offer.quantity)} · retail {rupees(variant.price * offer.quantity)}</p> : null
+              })()}
             </div>
             {editable && (
               <div className="row-actions">

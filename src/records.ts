@@ -28,6 +28,7 @@ export type VariantRow = {
   itemsPerBox: number
   price: number
   buyingPrice: number
+  purchaseUnit: 'box' | 'item'
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -242,6 +243,7 @@ export function toRows(state: State): DbRows {
         itemsPerBox: variant.itemsPerBox,
         price: variant.price,
         buyingPrice: variant.buyingPrice ?? 0,
+        purchaseUnit: variant.purchaseUnit ?? 'box',
         currentStock: variant.currentStock,
         minimumStock: variant.minimumStock,
         desiredStock: variant.desiredStock,
@@ -411,6 +413,7 @@ export function fromRows(rows: DbRows): State {
         itemsPerBox: variant.itemsPerBox,
         price: variant.price,
         ...(variant.buyingPrice ? { buyingPrice: variant.buyingPrice } : {}),
+        purchaseUnit: variant.purchaseUnit,
         currentStock: variant.currentStock,
         minimumStock: variant.minimumStock,
         desiredStock: variant.desiredStock,

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { BoxMath } from '../components/BoxMath'
-import { DesiredField } from '../components/DesiredField'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
 import { StatusPill } from '../components/Status'
 import { PurchaseDialog, ReceivePurchaseDialog } from '../components/StockDialogs'
@@ -59,7 +58,7 @@ export function NeedToBuyView() {
           <h2>Need to buy</h2>
           <p className="lede">
             A variant is listed when current stock is below its minimum. Purchase quantity is
-            desired stock minus current stock. Boxes round up so every box is complete. Sales,
+            minimum stock minus current stock. Boxes round up so every box is complete. Sales,
             orders, adjustments, and receipts update this list immediately.
           </p>
         </div>
@@ -148,10 +147,6 @@ export function NeedToBuyView() {
                   <small>Items</small>
                 </th>
                 <th className="num">
-                  Desired stock
-                  <small>Items</small>
-                </th>
-                <th className="num">
                   Purchase quantity
                   <small>Items</small>
                 </th>
@@ -188,18 +183,11 @@ export function NeedToBuyView() {
                     <td data-label="Minimum stock" className="num" data-testid="minimum-stock">
                       {row.variant.minimumStock.toLocaleString()}
                     </td>
-                    <td data-label="Desired stock" className="num">
-                      <DesiredField
-                        value={row.variant.desiredStock}
-                        label={`Desired stock for ${row.productName} ${row.variant.name}`}
-                        onSave={(desired) => market.setDesired(row.productId, row.variant.id, desired)}
-                      />
-                    </td>
                     <td data-label="Purchase quantity" className="num purchase-cell">
                       <strong className="qty" data-testid="purchase-qty">
-                        {row.calc.purchaseQty.toLocaleString()}
+                        {row.variant.purchaseUnit === 'item' ? row.calc.purchaseQty.toLocaleString() : row.calc.boxes.toLocaleString()}
                       </strong>
-                      <BoxMath calc={row.calc} />
+                      {row.variant.purchaseUnit === 'item' ? <span className="muted"> items</span> : <BoxMath calc={row.calc} />}
                     </td>
                     <td data-label="Actions" className="actions">
                       <div className="row-actions">
@@ -217,7 +205,7 @@ export function NeedToBuyView() {
                         )}
                       </div>
                       {row.calc.boxes > 0 && (
-                        <p className="hint action-hint">Suggested {boxesLabel(row.calc.boxes)}</p>
+                        <p className="hint action-hint">Suggested {row.variant.purchaseUnit === 'item' ? itemsLabel(row.calc.purchaseQty) : boxesLabel(row.calc.boxes)}</p>
                       )}
                     </td>
                   </tr>

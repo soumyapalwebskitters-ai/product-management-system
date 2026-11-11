@@ -40,6 +40,13 @@ export function OfferForm({
       ),
     [state.products],
   )
+  const selectedGift = useMemo(() => {
+    const [productId, variantId] = giftId?.split(':') ?? []
+    const product = state.products.find((item) => item.id === productId)
+    const variant = product?.variants.find((item) => item.id === variantId)
+    return variant ? { variant } : null
+  }, [giftId, state.products])
+  const giftQuantity = parseWhole(quantity) ?? 0
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -130,7 +137,8 @@ export function OfferForm({
             <span>Free quantity</span>
             <input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
           </label>
-          {giftId && <p className="hint">The buyer does not pay for these items, and there is no extra cash discount.</p>}
+          {selectedGift && <p className="preview">Seller only: purchase cost {rupees((selectedGift.variant.buyingPrice ?? 0) * giftQuantity)} · retail value {rupees(selectedGift.variant.price * giftQuantity)}</p>}
+          {giftId && <p className="hint">The buyer receives this free item. Its purchase cost remains seller-only.</p>}
         </>
       )}
       <p className="hint">

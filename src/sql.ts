@@ -6,7 +6,7 @@ export type SqlStatement = {
 }
 
 export type Sql = {
-  first<T>(sql: string): Promise<T | null>
-  all<T>(sql: string): Promise<T[]>
+  first<T>(sql: string, params?: SqlValue[]): Promise<T | null>
+  all<T>(sql: string, params?: SqlValue[]): Promise<T[]>
   batch(statements: SqlStatement[]): Promise<void>
 }
