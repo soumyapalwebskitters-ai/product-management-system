@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "market",
@@ -10,11 +11,19 @@
       "persist": true
     }
   },
+=======
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "market",
+  "compatibility_date": "2026-11-10",
+  "main": "./worker/index.ts",
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
+<<<<<<< HEAD
   "d1_databases": [
     {
       "binding": "DB",
@@ -24,3 +33,14 @@
     }
   ]
 }
+=======
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "market",
+      "database_id": "f5dacd2e-39db-4689-b5ec-f1d523b0bb61",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b

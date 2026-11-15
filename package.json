@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "name": "market",
   "private": true,
@@ -26,3 +27,33 @@
     "wrangler": "^4.160.0"
   }
 }
+=======
+{
+  "name": "market",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-sqlite ./node_modules/vite/bin/vite.js",
+    "build": "tsc --noEmit && tsc -p tsconfig.worker.json && vite build",
+    "preview": "node --experimental-sqlite ./node_modules/vite/bin/vite.js preview",
+    "deploy": "npm run build && wrangler deploy",
+    "db:apply:remote": "wrangler d1 migrations apply market --remote",
+    "test": "node --experimental-sqlite --import tsx --test src/purchase.test.ts src/inventory.test.ts src/search.test.ts src/offers.test.ts src/orders.test.ts src/paymentStatus.test.ts src/records.test.ts src/persist.test.ts"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "wrangler": "^4.160.0"
+  }
+}
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b

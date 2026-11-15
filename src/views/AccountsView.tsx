@@ -80,4 +80,8 @@ function TrendingProducts({ values, sales }: { values: Array<{ id: string; name:
   </section>
 }
 function receivedOn(order: CustomerOrder, account: PaymentMethod | null) { if (account && order.paymentMethod !== account) return 0; return Math.min(Math.max(0, order.paid), order.total) }
+<<<<<<< HEAD
 function dayKey(iso: string) { const date = new Date(iso); if (Number.isNaN(date.getTime())) return ''; return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') }
+=======
+function dayKey(iso: string) { const date = new Date(iso); if (Number.isNaN(date.getTime())) return ''; return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') }
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b

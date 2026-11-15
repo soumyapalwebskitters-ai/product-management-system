@@ -1,11 +1,19 @@
 import { handleState } from '../src/shopApi'
 import { createBuyerAccount, currentAccount, expiredSessionCookie, login, loginSeller, logout, resetSellerPassword, sellerExists, sessionCookie, setupSeller } from './auth'
 import type { Sql, SqlStatement, SqlValue } from '../src/sql'
+<<<<<<< HEAD
 
 type Env = {
   DB: D1Database
 }
 
+=======
+
+type Env = {
+  DB: D1Database
+}
+
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
 function json(data: unknown, status = 200, extraHeaders: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -22,6 +30,24 @@ async function requestBody(request: Request) {
     return { ok: true as const, body: await request.json() }
   } catch {
     return { ok: false as const }
+<<<<<<< HEAD
+  }
+}
+
+function d1(db: D1Database): Sql {
+  return {
+    async first<T>(sql: string, params: SqlValue[] = []) {
+      return db.prepare(sql).bind(...params).first<T>()
+    },
+    async all<T>(sql: string, params: SqlValue[] = []) {
+      const result = await db.prepare(sql).bind(...params).all<T>()
+      return result.results ?? []
+    },
+    async batch(statements: SqlStatement[]) {
+      await db.batch(statements.map((statement) => db.prepare(statement.sql).bind(...statement.params)))
+    },
+=======
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
   }
 }
 
@@ -64,6 +90,7 @@ export default {
     if (url.pathname === '/api/auth/seller/login' && request.method === 'POST') {
       const parsed = await requestBody(request)
       if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
+<<<<<<< HEAD
       try {
         const result = await loginSeller(db, parsed.body)
         const headers: HeadersInit = 'token' in result && 'expiresAt' in result ? { 'set-cookie': sessionCookie(result.token, result.expiresAt) } : []
@@ -97,12 +124,50 @@ export default {
     if (url.pathname !== '/api/state') return json({ error: 'Not found.' }, 404)
     let body: unknown = null
     if (request.method === 'PUT') {
+=======
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
+      try {
+        const result = await loginSeller(db, parsed.body)
+        const headers: HeadersInit = 'token' in result && 'expiresAt' in result ? { 'set-cookie': sessionCookie(result.token, result.expiresAt) } : []
+        return json(result.body, result.status, headers)
+      } catch (error) {
+        return json({ error: 'Could not start seller access.' }, 500)
+      }
+    }
+<<<<<<< HEAD
+=======
+    if (url.pathname === '/api/auth/seller/password' && request.method === 'PUT') {
+      const parsed = await requestBody(request)
+      if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
+      const result = await resetSellerPassword(db, await currentAccount(db, request), parsed.body)
+      return json(result.body, result.status)
+    }
+    if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+      const result = await logout(db, request)
+      return json(result.body, result.status, { 'set-cookie': expiredSessionCookie() })
+    }
+    if (url.pathname === '/api/auth/me' && request.method === 'GET') {
+      const account = await currentAccount(db, request)
+      return account ? json({ account }) : json({ error: 'Authentication required.' }, 401)
+    }
+    if (url.pathname === '/api/auth/buyers' && request.method === 'POST') {
+      const seller = await currentAccount(db, request)
+      if (!seller) return json({ error: 'Authentication required.' }, 401)
+      const parsed = await requestBody(request)
+      if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
+      const result = await createBuyerAccount(db, seller, parsed.body)
+      return json(result.body, result.status)
+    }
+    if (url.pathname !== '/api/state') return json({ error: 'Not found.' }, 404)
+    let body: unknown = null
+    if (request.method === 'PUT') {
       try {
         body = await request.json()
       } catch {
         return json({ error: 'Expected JSON.' }, 400)
       }
     }
+>>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
     const result = await handleState(request.method, body, db)
     return json(result.body, result.status)
   },
