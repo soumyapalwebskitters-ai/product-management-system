@@ -3,7 +3,7 @@ import { Icon } from '../components/Icon'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
 import { useMarket } from '../store'
 import type { SearchMode } from '../search'
-import { normalizeDriveImageUrl } from '../gallery'
+import { galleryImageSrc, normalizeDriveImageUrl } from '../gallery'
 
 export function GalleryView() {
   const { state, addGalleryImage, removeGalleryImage } = useMarket()
@@ -39,7 +39,7 @@ export function GalleryView() {
       <h3>Add gallery image</h3><p className="hint">Set the Drive file to “Anyone with the link” and paste its share URL.</p>
       <ProductSelect label="Choose product variant" placeholder="Search product or variant" options={options} query={query} mode={mode} selectedId={selectedId} onQueryChange={setQuery} onModeChange={setMode} onSelect={setSelectedId} />
       <label className="field"><span>Google Drive image URL</span><input type="url" value={url} placeholder="https://drive.google.com/uc?id=..." onChange={(event) => setUrl(event.target.value)} /></label>
-      {url && <img className="gallery-preview" src={normalizeDriveImageUrl(url)} alt="Preview" onError={(event) => { event.currentTarget.style.display = 'none' }} onLoad={(event) => { event.currentTarget.style.display = 'block' }} />}
+      {url && <img className="gallery-preview" src={galleryImageSrc(normalizeDriveImageUrl(url))} alt="Preview" onError={(event) => { event.currentTarget.style.display = 'none' }} onLoad={(event) => { event.currentTarget.style.display = 'block' }} />}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="dialog-actions"><button type="button" className="btn" onClick={save}>Add to gallery</button></div>
     </section>
@@ -47,7 +47,7 @@ export function GalleryView() {
       {linked.length === 0 ? <div className="empty"><Icon name="eye" /><h3>No gallery images yet</h3><p>Add a Drive image and assign it to a variant.</p></div> : linked.map((item) => {
         const product = state.products.find((entry) => entry.id === item.productId)
         const variant = product?.variants.find((entry) => entry.id === item.variantId)
-        return <article className="gallery-card" key={item.id}><img src={item.url} alt={`${product?.name ?? 'Product'} ${variant?.name ?? 'Variant'}`} /><div><strong>{product?.name ?? 'Product removed'}</strong><span>{variant?.name || 'Standard'}</span></div><button type="button" className="btn danger-text small" onClick={() => removeGalleryImage(item.id)}>Remove</button></article>
+        return <article className="gallery-card" key={item.id}><img src={galleryImageSrc(item.url)} alt={`${product?.name ?? 'Product'} ${variant?.name ?? 'Variant'}`} /><div><strong>{product?.name ?? 'Product removed'}</strong><span>{variant?.name || 'Standard'}</span></div><button type="button" className="btn danger-text small" onClick={() => removeGalleryImage(item.id)}>Remove</button></article>
       })}
     </section>
   </section>

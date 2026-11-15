@@ -40,10 +40,27 @@ function d1(db: D1Database): Sql {
   }
 }
 
+async function galleryImage(request: Request) {
+  const source = new URL(request.url).searchParams.get('url')
+  if (!source) return new Response('Missing image URL.', { status: 400 })
+  let parsed: URL
+  try { parsed = new URL(source) } catch { return new Response('Invalid image URL.', { status: 400 }) }
+  const host = parsed.hostname.toLowerCase()
+  if (host !== 'drive.google.com' && host !== 'drive.usercontent.google.com') return new Response('Image host is not allowed.', { status: 403 })
+  const upstream = await fetch(parsed.toString(), { redirect: 'follow' })
+  if (!upstream.ok) return new Response('Image could not be loaded.', { status: upstream.status })
+  const contentType = upstream.headers.get('content-type') || 'application/octet-stream'
+  if (!contentType.toLowerCase().startsWith('image/')) return new Response('URL did not return an image.', { status: 415 })
+  return new Response(upstream.body, { status: 200, headers: { 'content-type': contentType, 'cache-control': 'public, max-age=3600', 'access-control-allow-origin': '*' } })
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url)
     const db = d1(env.DB)
+    if (url.pathname === '/api/gallery-image' && request.method === 'GET') {
+      try { return await galleryImage(request) } catch { return new Response('Image could not be loaded.', { status: 502 }) }
+    }
     if (url.pathname === '/api/auth/bootstrap' && request.method === 'GET') {
       return json({ sellerSetupRequired: !(await sellerExists(db)) })
     }

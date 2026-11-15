@@ -12,6 +12,19 @@ export function normalizeDriveImageUrl(value: string) {
   return url
 }
 
+export function galleryImageSrc(value: string) {
+  if (!value) return value
+  try {
+    const host = new URL(value).hostname.toLowerCase()
+    if (host === 'drive.google.com' || host === 'drive.usercontent.google.com') {
+      return `/api/gallery-image?url=${encodeURIComponent(value)}`
+    }
+  } catch {
+    return value
+  }
+  return value
+}
+
 export function addGalleryImage(state: State, input: Omit<GalleryImage, 'id' | 'createdAt'>, now: string): Outcome {
   if (!/^https?:\/\//i.test(input.url.trim())) return fail('Enter a valid Google Drive image URL.')
   const imageUrl = normalizeDriveImageUrl(input.url)
