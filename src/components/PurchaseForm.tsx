@@ -57,7 +57,7 @@ export function PurchaseForm({
         product.variants.map((variant) => ({
           id: `${product.id}:${variant.id}`,
           title: `${product.name} · ${variant.name}`,
-          meta: rupees(variant.price),
+          meta: `${rupees(sellingPrice(variant))} per ${sellingUnitLabel(variant)}`,
           searchText: `${product.name} ${variant.name} ${variant.sku}`,
         })),
       ),
@@ -73,11 +73,12 @@ export function PurchaseForm({
         ?.variants.find((item) => item.id === line.variantId)
       if (!place || quantity === null || !variant) return []
       const previous = order?.lines.find((item) => item.variantId === line.variantId)
+      const stockQuantity = quantity * (variant.sellingUnit === 'box' ? variant.itemsPerBox : 1)
       return [
         {
           productId: line.productId,
           variantId: line.variantId,
-          quantity,
+          quantity: stockQuantity,
           unitPrice: previous?.unitPrice ?? variant.price,
           label: place,
         },
@@ -90,24 +91,21 @@ export function PurchaseForm({
     return { priced, subtotal, offer, upcoming: nextOffer(state.offers, subtotal) }
   }, [lines, order?.lines, state])
 
-  function addLine(id: string | null) {
-    if (!id) return
-    const [productId, variantId] = id.split(':')
-    if (!productId || !variantId) return
-    setLines((current) => {
-      if (current.some((line) => line.variantId === variantId)) return current
-      return [...current, { key: id, productId, variantId, quantity: '1' }]
-    })
-    setQuery('')
+  function setSelectedProducts(ids: string[]) {
+    setLines((current) => ids.flatMap((id) => {
+      const [productId, variantId] = id.split(':')
+      if (!productId || !variantId) return []
+      return [current.find((line) => line.key === id) ?? { key: id, productId, variantId, quantity: '1' }]
+    }))
   }
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    const parsed = lines.map((line) => ({
-      productId: line.productId,
-      variantId: line.variantId,
-      quantity: parseWhole(line.quantity) ?? -1,
-    }))
+    const parsed = lines.map((line) => {
+      const variant = state.products.find((product) => product.id === line.productId)?.variants.find((item) => item.id === line.variantId)
+      const quantity = parseWhole(line.quantity) ?? -1
+      return { productId: line.productId, variantId: line.variantId, quantity: quantity * (variant?.sellingUnit === 'box' ? variant.itemsPerBox : 1) }
+    })
     const paid = received.trim() === '' ? 0 : parseWhole(received)
     if (paid === null) {
       setError('Enter the amount received as a whole number of rupees.')
@@ -177,34 +175,37 @@ export function PurchaseForm({
       <div className="field">
         <span>Add an item</span>
         <ProductSelect
-          label="Item to buy"
-          placeholder="Search the catalog"
+          label="Products to add"
+          placeholder="Select products"
           options={options}
           query={query}
           mode={searchMode}
           selectedId={null}
+          selectedIds={lines.map((line) => line.key)}
+          multiple
           onQueryChange={setQuery}
           onModeChange={setSearchMode}
-          onSelect={addLine}
+          onSelect={() => undefined}
+          onMultiSelect={setSelectedProducts}
           inline
         />
       </div>
 
       {lines.length === 0 ? (
-        <p className="hint">Choose an item. Typing a letter lists every matching name.</p>
+        <p className="hint">Choose one or more products. Type a letter to find matching catalog items.</p>
       ) : (
         <ul className="line-list">
           {lines.map((line) => {
             const place = findCatalogItem(state, line.productId, line.variantId)
-            const priced = preview.priced.find((item) => item.variantId === line.variantId)
+            const variant = state.products.find((product) => product.id === line.productId)?.variants.find((item) => item.id === line.variantId)
             return (
               <li key={line.key}>
                 <div>
                   <strong>{place ? `${place.productName} · ${place.variantName}` : 'Removed item'}</strong>
-                  <span>{priced ? rupees(priced.unitPrice) : ''} each</span>
+                  <span>{variant ? `${rupees(sellingPrice(variant))} per ${sellingUnitLabel(variant)}` : ''}</span>
                 </div>
                 <label>
-                  <span className="sr-only">Quantity</span>
+                  <span className="sr-only">Quantity in {variant ? sellingUnitLabel(variant) : 'items'}</span>
                   <input
                     inputMode="numeric"
                     value={line.quantity}
@@ -288,4 +289,12 @@ export function PurchaseForm({
       </div>
     </form>
   )
+}
+
+function sellingUnitLabel(variant: { sellingUnit?: 'box' | 'item' }) {
+  return variant.sellingUnit === 'box' ? 'box' : 'piece'
+}
+
+function sellingPrice(variant: { price: number; sellingUnit?: 'box' | 'item'; itemsPerBox: number }) {
+  return variant.sellingUnit === 'box' ? variant.price * variant.itemsPerBox : variant.price
 }

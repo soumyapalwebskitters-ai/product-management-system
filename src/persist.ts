@@ -7,6 +7,7 @@ import {
   type LineRow,
   type MovementRow,
   type OfferRow,
+  type OfferGiftRow,
   type OrderRow,
   type ProductRow,
   type PurchaseRow,
@@ -29,7 +30,7 @@ export async function readShop(db: Sql): Promise<{ revision: number; state: Stat
   )
   const variants = await db.all<VariantRow>(
     `SELECT id, product_id AS productId, name, sku, items_per_box AS itemsPerBox, price,
-            buying_price AS buyingPrice,
+            buying_price AS buyingPrice, purchase_unit AS purchaseUnit, selling_unit AS sellingUnit,
             current_stock AS currentStock, minimum_stock AS minimumStock, desired_stock AS desiredStock,
             position
      FROM variants`,
@@ -65,21 +66,26 @@ export async function readShop(db: Sql): Promise<{ revision: number; state: Stat
   )
   const gifts = await db.all<GiftRow>(
     `SELECT order_id AS orderId, position, product_id AS productId, variant_id AS variantId,
-            product_name AS productName, variant_name AS variantName, sku, quantity
+            product_name AS productName, variant_name AS variantName, sku, quantity, unit_price AS unitPrice
      FROM order_gifts`,
   )
   const offers = await db.all<OfferRow>(
     `SELECT id, name, minimum_amount AS minimumAmount, reward, percent, product_id AS productId,
-            variant_id AS variantId, quantity, position
+            variant_id AS variantId, quantity, quantity_unit AS quantityUnit, position
      FROM offers`,
   )
+  const offerGifts = await db.all<OfferGiftRow>(
+    `SELECT offer_id AS offerId, position, product_id AS productId, variant_id AS variantId,
+            quantity, quantity_unit AS quantityUnit
+     FROM offer_gifts`,
+  )
   const seller = await db.first<SellerRow>(
-    `SELECT name, address, gst, business_name AS businessName, profile_image AS profileImage, logo,
+    `SELECT name, email, phone, address, gst, business_name AS businessName, profile_image AS profileImage, logo,
             facebook, instagram, youtube, whatsapp
      FROM seller WHERE id = 1`,
   )
 
-  const tables: DbRows = { products, variants, purchases, movements, buyers, orders, lines, gifts, offers, seller }
+  const tables: DbRows = { products, variants, purchases, movements, buyers, orders, lines, gifts, offers, offerGifts, seller }
   return { revision: shop.revision, state: fromRows(tables) }
 }
 
@@ -93,6 +99,7 @@ export async function writeShop(db: Sql, state: State, revision: number) {
     statement('DELETE FROM purchases'),
     statement('DELETE FROM variants'),
     statement('DELETE FROM products'),
+    statement('DELETE FROM offer_gifts'),
     statement('DELETE FROM offers'),
     statement('DELETE FROM buyers'),
     statement('DELETE FROM seller'),
@@ -115,8 +122,8 @@ export async function writeShop(db: Sql, state: State, revision: number) {
     statements.push(
       statement(
         `INSERT INTO variants (
-           id, product_id, name, sku, items_per_box, price, buying_price, current_stock, minimum_stock, desired_stock, position
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           id, product_id, name, sku, items_per_box, price, buying_price, purchase_unit, selling_unit, current_stock, minimum_stock, desired_stock, position
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           variant.id,
           variant.productId,
@@ -125,6 +132,8 @@ export async function writeShop(db: Sql, state: State, revision: number) {
           variant.itemsPerBox,
           variant.price,
           variant.buyingPrice,
+          variant.purchaseUnit,
+          variant.sellingUnit,
           variant.currentStock,
           variant.minimumStock,
           variant.desiredStock,
@@ -249,8 +258,8 @@ export async function writeShop(db: Sql, state: State, revision: number) {
     statements.push(
       statement(
         `INSERT INTO order_gifts (
-           order_id, position, product_id, variant_id, product_name, variant_name, sku, quantity
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           order_id, position, product_id, variant_id, product_name, variant_name, sku, quantity, unit_price
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           gift.orderId,
           gift.position,
@@ -260,6 +269,7 @@ export async function writeShop(db: Sql, state: State, revision: number) {
           gift.variantName,
           gift.sku,
           gift.quantity,
+          gift.unitPrice,
         ],
       ),
     )
@@ -268,8 +278,8 @@ export async function writeShop(db: Sql, state: State, revision: number) {
     statements.push(
       statement(
         `INSERT INTO offers (
-           id, name, minimum_amount, reward, percent, product_id, variant_id, quantity, position
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           id, name, minimum_amount, reward, percent, product_id, variant_id, quantity, quantity_unit, position
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           offer.id,
           offer.name,
@@ -279,19 +289,31 @@ export async function writeShop(db: Sql, state: State, revision: number) {
           offer.productId,
           offer.variantId,
           offer.quantity,
+          offer.quantityUnit,
           offer.position,
         ],
+      ),
+    )
+  }
+  for (const gift of tables.offerGifts) {
+    statements.push(
+      statement(
+        `INSERT INTO offer_gifts (offer_id, position, product_id, variant_id, quantity, quantity_unit)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [gift.offerId, gift.position, gift.productId, gift.variantId, gift.quantity, gift.quantityUnit],
       ),
     )
   }
   statements.push(
     statement(
       `INSERT INTO seller (
-         id, name, address, gst, business_name, profile_image, logo, facebook, instagram, youtube, whatsapp
-       ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         id, name, email, phone, address, gst, business_name, profile_image, logo, facebook, instagram, youtube, whatsapp
+       ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       tables.seller
         ? [
             tables.seller.name,
+            tables.seller.email,
+            tables.seller.phone,
             tables.seller.address,
             tables.seller.gst,
             tables.seller.businessName,
@@ -302,7 +324,7 @@ export async function writeShop(db: Sql, state: State, revision: number) {
             tables.seller.youtube,
             tables.seller.whatsapp,
           ]
-        : ['', '', '', '', '', '', '', '', '', ''],
+        : ['', '', '', '', '', '', '', '', '', '', '', ''],
     ),
   )
   statements.push(

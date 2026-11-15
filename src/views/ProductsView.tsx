@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
-import { DesiredField } from '../components/DesiredField'
 import { ProductForm } from '../components/ProductForm'
 import { StatusPill } from '../components/Status'
 import { AdjustDialog, PurchaseDialog, ReceiveDialog, SaleDialog } from '../components/StockDialogs'
-import { boxesLabel, rupees } from '../format'
-import { calcPurchase, needsRestock } from '../purchase'
+import { rupees } from '../format'
+import { calcPurchase } from '../purchase'
 import { catalogStats, onOrderItems, stockStatus } from '../inventory'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
 import { ProductPhoto } from '../components/ProductImageField'
+import { Icon } from '../components/Icon'
 import { matchesQuery, type SearchMode } from '../search'
 import { useMarket } from '../store'
 import type { Product, Variant } from '../types'
@@ -161,14 +161,9 @@ export function ProductsView() {
                 <th>SKU</th>
                 <th className="num">Unit price</th>
                 <th className="num">Buying price</th>
-                <th className="num">Per box</th>
-                <th className="num">Box price</th>
                 <th className="num">Current</th>
-                <th className="num">Stock value</th>
                 <th className="num">Minimum</th>
-                <th className="num">Desired</th>
                 <th>Status</th>
-                <th className="num">To buy</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -176,36 +171,31 @@ export function ProductsView() {
               {visible.flatMap(({ product, variants }) =>
                 variants.map((variant, index) => {
                   const status = stockStatus(variant)
-                  const calc = calcPurchase(
-                    variant.currentStock,
-                    variant.desiredStock,
-                    variant.itemsPerBox,
-                  )
                   const pending = onOrderItems(state, variant.id)
                   const coverage =
-                    variant.desiredStock <= 0
+                    variant.minimumStock <= 0
                       ? variant.currentStock > 0
                         ? 100
                         : 0
-                      : Math.max(0, Math.min(100, Math.round((variant.currentStock / variant.desiredStock) * 100)))
-                  const boxPrice = variant.price * variant.itemsPerBox
-                  const stockValue = variant.price * variant.currentStock
+                      : Math.max(0, Math.min(100, Math.round((variant.currentStock / variant.minimumStock) * 100)))
                   return (
-                    <tr key={variant.id} className={status === 'ok' ? undefined : status}>
+                    <tr key={variant.id} className={`${index === 0 ? 'product-group-start ' : ''}${status === 'ok' ? '' : status}`.trim() || undefined}>
                       {index === 0 && (
                         <td data-label="Product" className="product-cell" rowSpan={variants.length}>
                           <span className="item-with-photo"><ProductPhoto src={product.image ?? ''} name={product.name} /><strong>{product.name}</strong></span>
                           {product.note && <div className="pending">{product.note}</div>}
                           <div className="row-actions">
-                            <button type="button" className="btn secondary small" onClick={() => setEditing(product)}>
-                              Edit
+                            <button type="button" className="btn secondary small icon-action" aria-label="Edit product" title="Edit product" onClick={() => setEditing(product)}>
+                              <Icon name="edit" />
                             </button>
                             <button
                               type="button"
-                              className="btn danger-text small"
+                              className="btn danger-text small icon-action"
+                              aria-label="Delete product"
+                              title="Delete product"
                               onClick={() => setPendingDelete(product)}
                             >
-                              Delete
+                              <Icon name="trash" />
                             </button>
                           </div>
                         </td>
@@ -217,44 +207,26 @@ export function ProductsView() {
                       <td data-label="SKU" className="sku">{variant.sku}</td>
                       <td data-label="Unit price" className="num">{rupees(variant.price)}</td>
                       <td data-label="Buying price" className="num">{rupees(variant.buyingPrice ?? 0)}</td>
-                      <td data-label="Per box" className="num">{variant.itemsPerBox.toLocaleString()}</td>
-                      <td data-label="Box price" className="num">{rupees(boxPrice)}</td>
                       <td data-label="Current stock" className="num">
                         {variant.currentStock.toLocaleString()}
                         <div className={`meter ${status}`} aria-hidden="true">
                           <span style={{ width: `${coverage}%` }} />
                         </div>
                       </td>
-                      <td data-label="Stock value" className="num">{rupees(stockValue)}</td>
                       <td data-label="Minimum stock" className="num">{variant.minimumStock.toLocaleString()}</td>
-                      <td data-label="Desired stock" className="num">
-                        <DesiredField
-                          value={variant.desiredStock}
-                          label={`Desired stock for ${product.name} ${variant.name}`}
-                          onSave={(desired) => market.setDesired(product.id, variant.id, desired)}
-                        />
-                      </td>
                       <td data-label="Status">
                         <StatusPill status={status} />
-                      </td>
-                      <td data-label="To buy" className="num">
-                        {needsRestock(variant.currentStock, variant.minimumStock) ? (
-                          <span className="to-buy">
-                            {calc.purchaseQty.toLocaleString()}
-                            {calc.boxes > 0 && <small>{boxesLabel(calc.boxes)}</small>}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
                       </td>
                       <td data-label="Actions" className="actions">
                         <div className="row-actions">
                           <button
                             type="button"
-                            className="btn secondary small"
+                            className="btn secondary small icon-action"
+                            aria-label="Adjust stock"
+                            title="Adjust stock"
                             onClick={() => setStockTarget({ mode: 'adjust', product, variant })}
                           >
-                            Adjust
+                            <Icon name="adjust" />
                           </button>
                           {status !== 'ok' && (
                             <button
@@ -274,17 +246,7 @@ export function ProductsView() {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={7}>Stock value of the rows above</td>
-                <td className="num">
-                  {rupees(
-                    visible.reduce(
-                      (sum, entry) =>
-                        sum + entry.variants.reduce((inner, variant) => inner + variant.price * variant.currentStock, 0),
-                      0,
-                    ),
-                  )}
-                </td>
-                <td colSpan={5} />
+                <td colSpan={9}>Product list</td>
               </tr>
             </tfoot>
           </table>
@@ -295,7 +257,7 @@ export function ProductsView() {
         <Dialog title="Add product" onClose={() => setCreating(false)} wide closeOnBackdrop={false}>
           <ProductForm
             knownSkus={state.products.flatMap((item) => item.variants.map((variant) => variant.sku))}
-            submitLabel="Save product"
+            submitLabel="Save now"
             onCancel={() => setCreating(false)}
             onSubmit={(input) => {
               const result = market.addProduct(input)

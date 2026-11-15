@@ -26,6 +26,10 @@ function isInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value)
 }
 
+function isMoney(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && Number.isSafeInteger(Math.round(value * 100))
+}
+
 function isVariant(value: unknown): value is Variant {
   if (!isRecord(value)) return false
   return (
@@ -33,8 +37,10 @@ function isVariant(value: unknown): value is Variant {
     typeof value.name === 'string' &&
     typeof value.sku === 'string' &&
     isInteger(value.itemsPerBox) &&
-    (value.price === undefined || isInteger(value.price)) &&
-    (value.buyingPrice === undefined || (isInteger(value.buyingPrice) && value.buyingPrice >= 0)) &&
+    (value.price === undefined || isMoney(value.price)) &&
+    (value.buyingPrice === undefined || isMoney(value.buyingPrice)) &&
+    (value.sellingUnit === undefined || value.sellingUnit === 'box' || value.sellingUnit === 'item') &&
+    (value.note === undefined || typeof value.note === 'string') &&
     isInteger(value.currentStock) &&
     isInteger(value.minimumStock) &&
     isInteger(value.desiredStock)
@@ -142,7 +148,8 @@ function isGiftLine(value: unknown): value is GiftLine {
     typeof value.productName === 'string' &&
     typeof value.variantName === 'string' &&
     typeof value.sku === 'string' &&
-    isInteger(value.quantity)
+    isInteger(value.quantity) &&
+    (value.unitPrice === undefined || isMoney(value.unitPrice))
   )
 }
 
@@ -200,7 +207,15 @@ function isOffer(value: unknown): value is Offer {
     isInteger(value.percent) &&
     typeof value.productId === 'string' &&
     typeof value.variantId === 'string' &&
-    isInteger(value.quantity)
+    isInteger(value.quantity) &&
+    (value.quantityUnit === undefined || value.quantityUnit === 'box' || value.quantityUnit === 'item') &&
+    (value.giftItems === undefined || (Array.isArray(value.giftItems) && value.giftItems.every((gift) =>
+      isRecord(gift) &&
+      typeof gift.productId === 'string' &&
+      typeof gift.variantId === 'string' &&
+      isInteger(gift.quantity) &&
+      (gift.quantityUnit === undefined || gift.quantityUnit === 'box' || gift.quantityUnit === 'item'),
+    )))
   )
 }
 
@@ -223,6 +238,8 @@ function isSeller(value: unknown): value is SellerProfile {
   if (!isRecord(value)) return false
   return (
     isText(value.name, 80) &&
+    isText(value.email, 160) &&
+    isText(value.phone, 30) &&
     isText(value.address, 200) &&
     isText(value.gst, 20) &&
     isText(value.businessName, 80) &&
@@ -264,6 +281,7 @@ function pricedProducts(products: Product[]) {
     variants: product.variants.map((variant) => ({
       ...variant,
       price: variant.price ?? knownPrices[variant.sku] ?? 0,
+      sellingUnit: variant.sellingUnit ?? 'item',
     })),
   }))
 }

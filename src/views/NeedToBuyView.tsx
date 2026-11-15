@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { BoxMath } from '../components/BoxMath'
-import { DesiredField } from '../components/DesiredField'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
 import { StatusPill } from '../components/Status'
 import { PurchaseDialog, ReceivePurchaseDialog } from '../components/StockDialogs'
@@ -8,6 +7,8 @@ import { boxesLabel, itemsLabel } from '../format'
 import { buyRows, type BuyRow } from '../inventory'
 import { matchesQuery, type SearchMode } from '../search'
 import { useMarket } from '../store'
+import { Icon } from '../components/Icon'
+import { openMailto } from '../mailto'
 
 type Filter = 'all' | 'out' | 'low'
 
@@ -20,6 +21,18 @@ export function NeedToBuyView() {
   const [filter, setFilter] = useState<Filter>('all')
   const [buying, setBuying] = useState<BuyRow | null>(null)
   const [receiveId, setReceiveId] = useState<string | null>(null)
+  const [emailMessage, setEmailMessage] = useState<string | null>(null)
+  const [emailing, setEmailing] = useState(false)
+
+  async function emailReport() {
+    setEmailing(true)
+    const text = rows.length
+      ? rows.map((row) => `${row.productName} · ${row.variant.name || 'Standard'} — current: ${row.variant.currentStock}, minimum: ${row.variant.minimumStock}, buy: ${row.variant.purchaseUnit === 'item' ? `${row.calc.purchaseQty} items` : `${row.calc.boxes} boxes`}`).join('\n')
+      : 'No products need restocking.'
+    const opened = openMailto(market.state.seller?.email, `${market.state.seller?.businessName || 'Baji Market'}: Need to buy`, text)
+    setEmailMessage(opened ? 'Email draft opened.' : 'Save a valid seller email first.')
+    setEmailing(false)
+  }
 
   const options = useMemo<SelectOption[]>(
     () =>
@@ -59,11 +72,15 @@ export function NeedToBuyView() {
           <h2>Need to buy</h2>
           <p className="lede">
             A variant is listed when current stock is below its minimum. Purchase quantity is
-            desired stock minus current stock. Boxes round up so every box is complete. Sales,
+            minimum stock minus current stock. Boxes round up so every box is complete. Sales,
             orders, adjustments, and receipts update this list immediately.
           </p>
         </div>
+        <button type="button" className="btn secondary" onClick={emailReport} disabled={emailing}>
+          <Icon name="mail" /> {emailing ? 'Emailing…' : 'Email list'}
+        </button>
       </div>
+      {emailMessage && <p className="hint" role="status">{emailMessage}</p>}
 
       <div className="summary" aria-label="Purchase summary">
         <article>
@@ -148,10 +165,6 @@ export function NeedToBuyView() {
                   <small>Items</small>
                 </th>
                 <th className="num">
-                  Desired stock
-                  <small>Items</small>
-                </th>
-                <th className="num">
                   Purchase quantity
                   <small>Items</small>
                 </th>
@@ -188,18 +201,11 @@ export function NeedToBuyView() {
                     <td data-label="Minimum stock" className="num" data-testid="minimum-stock">
                       {row.variant.minimumStock.toLocaleString()}
                     </td>
-                    <td data-label="Desired stock" className="num">
-                      <DesiredField
-                        value={row.variant.desiredStock}
-                        label={`Desired stock for ${row.productName} ${row.variant.name}`}
-                        onSave={(desired) => market.setDesired(row.productId, row.variant.id, desired)}
-                      />
-                    </td>
                     <td data-label="Purchase quantity" className="num purchase-cell">
                       <strong className="qty" data-testid="purchase-qty">
-                        {row.calc.purchaseQty.toLocaleString()}
+                        {row.variant.purchaseUnit === 'item' ? row.calc.purchaseQty.toLocaleString() : row.calc.boxes.toLocaleString()}
                       </strong>
-                      <BoxMath calc={row.calc} />
+                      {row.variant.purchaseUnit === 'item' ? <span className="muted"> items</span> : <BoxMath calc={row.calc} />}
                     </td>
                     <td data-label="Actions" className="actions">
                       <div className="row-actions">
@@ -217,7 +223,7 @@ export function NeedToBuyView() {
                         )}
                       </div>
                       {row.calc.boxes > 0 && (
-                        <p className="hint action-hint">Suggested {boxesLabel(row.calc.boxes)}</p>
+                        <p className="hint action-hint">Suggested {row.variant.purchaseUnit === 'item' ? itemsLabel(row.calc.purchaseQty) : boxesLabel(row.calc.boxes)}</p>
                       )}
                     </td>
                   </tr>

@@ -3,8 +3,8 @@ import type { SearchMode } from '../search'
 import { rupees } from '../format'
 import { parseWhole } from '../format'
 import type { OfferInput } from '../offers'
-import type { ActionResult } from '../store'
-import type { Offer, State } from '../types'
+import { DUPLICATE_DATA_ERROR, type ActionResult } from '../store'
+import type { Offer, OfferGift, State } from '../types'
 import { ProductSelect, type SelectOption } from './ProductSelect'
 
 export function OfferForm({
@@ -22,8 +22,11 @@ export function OfferForm({
   const [minimum, setMinimum] = useState(offer ? String(offer.minimumAmount) : '')
   const [reward, setReward] = useState<'discount' | 'gift'>(offer?.reward ?? 'discount')
   const [percent, setPercent] = useState(offer?.reward === 'discount' ? String(offer.percent) : '10')
-  const [giftId, setGiftId] = useState(offer?.reward === 'gift' ? `${offer.productId}:${offer.variantId}` : null)
-  const [quantity, setQuantity] = useState(offer?.reward === 'gift' ? String(offer.quantity) : '1')
+  const [gifts, setGifts] = useState<Array<OfferGift & { id: string }>>(() => {
+    if (offer?.reward !== 'gift') return []
+    const saved = offer.giftItems?.length ? offer.giftItems : [offer]
+    return saved.map((gift) => ({ ...gift, id: `${gift.productId}:${gift.variantId}` }))
+  })
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState<SearchMode>('smart')
   const [error, setError] = useState<string | null>(null)
@@ -33,19 +36,38 @@ export function OfferForm({
       state.products.flatMap((product) =>
         product.variants.map((variant) => ({
           id: `${product.id}:${variant.id}`,
-          title: `${product.name} · ${variant.name}`,
+          title: `${product.name} Â· ${variant.name}`,
           meta: variant.sku,
           searchText: `${product.name} ${variant.name} ${variant.sku}`,
         })),
       ),
     [state.products],
   )
+  const selectedGiftIds = gifts.map((gift) => gift.id)
+  const giftDetails = gifts.map((gift) => {
+    const product = state.products.find((item) => item.id === gift.productId)
+    const variant = product?.variants.find((item) => item.id === gift.variantId)
+    const pieces = gift.quantity * ((gift.quantityUnit ?? 'item') === 'box' ? variant?.itemsPerBox ?? 1 : 1)
+    return { gift, product, variant, pieces }
+  })
+
+  function selectGifts(ids: string[]) {
+    setGifts((current) => ids.map((id) => {
+      const found = current.find((gift) => gift.id === id)
+      if (found) return found
+      const [productId, variantId] = id.split(':')
+      return { id, productId, variantId, quantity: 1, quantityUnit: 'item' }
+    }))
+  }
+
+  function updateGift(id: string, changes: Partial<OfferGift>) {
+    setGifts((current) => current.map((gift) => gift.id === id ? { ...gift, ...changes } : gift))
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault()
     const minimumAmount = parseWhole(minimum)
     const parsedPercent = parseWhole(percent)
-    const parsedQuantity = parseWhole(quantity)
     if (!name.trim()) {
       setError('Enter a name for the offer.')
       return
@@ -54,16 +76,18 @@ export function OfferForm({
       setError('Enter the purchase amount that unlocks this offer.')
       return
     }
-    const [productId = '', variantId = ''] = giftId?.split(':') ?? []
+    const giftItems = gifts.map(({ id: _id, ...gift }) => ({ ...gift, quantity: parseWhole(String(gift.quantity)) ?? 0 }))
     const result = onSubmit(
       {
         name,
         minimumAmount,
         reward,
         percent: reward === 'discount' ? parsedPercent ?? 0 : 0,
-        productId: reward === 'gift' ? productId : '',
-        variantId: reward === 'gift' ? variantId : '',
-        quantity: reward === 'gift' ? parsedQuantity ?? 0 : 0,
+        productId: reward === 'gift' ? giftItems[0]?.productId ?? '' : '',
+        variantId: reward === 'gift' ? giftItems[0]?.variantId ?? '' : '',
+        quantity: reward === 'gift' ? giftItems[0]?.quantity ?? 0 : 0,
+        quantityUnit: reward === 'gift' ? giftItems[0]?.quantityUnit ?? 'item' : 'item',
+        giftItems: reward === 'gift' ? giftItems : [],
       },
       offer?.id ?? null,
     )
@@ -72,7 +96,7 @@ export function OfferForm({
 
   return (
     <form onSubmit={submit}>
-      {error && (
+      {error && error !== DUPLICATE_DATA_ERROR && (
         <p className="form-error" role="alert">
           {error}
         </p>
@@ -91,7 +115,7 @@ export function OfferForm({
         />
       </label>
       <p className="hint">When the bill reaches this amount, the buyer receives this one reward.</p>
-      <div className="filters" role="group" aria-label="Reward">
+      <div className="filters offer-reward-choice" role="group" aria-label="Reward">
         <button
           type="button"
           className="chip"
@@ -112,26 +136,39 @@ export function OfferForm({
       ) : (
         <>
           <div className="field">
-            <span>Gift</span>
+            <span>Gift items</span>
             <ProductSelect
-              label="Gift item"
-              placeholder="Select a gift"
+              label="Gift items"
+              placeholder="Select one or more gifts"
               options={options}
               query={query}
               mode={searchMode}
-              selectedId={giftId}
+              selectedId={null}
+              selectedIds={selectedGiftIds}
+              multiple
               onQueryChange={setQuery}
               onModeChange={setSearchMode}
-              onSelect={setGiftId}
+              onSelect={() => undefined}
+              onMultiSelect={selectGifts}
               inline
             />
           </div>
-          <label className="field">
-            <span>Free quantity</span>
-            <input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-          </label>
-          {giftId && <p className="hint">The buyer does not pay for these items, and there is no extra cash discount.</p>}
-        </>
+          {giftDetails.map(({ gift, product, variant, pieces }) => (
+            <div className="form-section" key={gift.id}>
+              <p className="field-label">{product?.name} · {variant?.name}</p>
+              <div className="choice-row" role="group" aria-label={`${product?.name} gift quantity unit`}>
+                <span>Give as</span>
+                <button type="button" aria-pressed={(gift.quantityUnit ?? 'item') === 'item'} onClick={() => updateGift(gift.id, { quantityUnit: 'item' })}>Pieces</button>
+                <button type="button" aria-pressed={gift.quantityUnit === 'box'} onClick={() => updateGift(gift.id, { quantityUnit: 'box' })}>Boxes</button>
+              </div>
+              <label className="field">
+                <span>Free {gift.quantityUnit === 'box' ? 'boxes' : 'pieces'}</span>
+                <input inputMode="numeric" value={gift.quantity} onChange={(event) => updateGift(gift.id, { quantity: parseWhole(event.target.value) ?? 0 })} />
+              </label>
+              {variant && <p className="preview">Seller only: purchase cost {rupees((variant.buyingPrice ?? 0) * pieces)} · retail value {rupees(variant.price * pieces)}</p>}
+            </div>
+          ))}
+          {gifts.length > 0 && <p className="hint">Every selected gift is added to the buyer's order and deducted from stock.</p>}        </>
       )}
       <p className="hint">
         {minimum.trim()

@@ -30,16 +30,14 @@ import {
   type PurchaseInput as BuyerPurchaseInput,
 } from './orders'
 import { deleteOffer, upsertOffer, type OfferInput } from './offers'
-import { ensureState, isCatalog, isRecord, isState } from './parseState'
-import { demoOffers, seedState } from './seed'
+import { ensureState, isRecord, isState } from './parseState'
 import { updateSeller } from './seller'
-import type { OrderStatus, ProductInput, PurchaseInput, SellerProfile, State } from './types'
+import { openMailto } from './mailto'
+import type { CustomerOrder, OrderStatus, ProductInput, PurchaseInput, SellerProfile, State } from './types'
 import type { BuyerInput } from './orders'
 
-const STORAGE_KEY = 'market.productManagement.v2'
-const LEGACY_KEY = 'market.productManagement.v1'
-
 export type ActionResult = { ok: true } | { ok: false; error: string }
+export const DUPLICATE_DATA_ERROR = 'Duplicate data found.'
 
 type MarketApi = {
   state: State
@@ -63,7 +61,6 @@ type MarketApi = {
   removeOffer: (offerId: string) => ActionResult
   saveSeller: (input: SellerProfile) => ActionResult
   importBuyer: (input: BuyerInput) => ActionResult
-  resetDemo: () => void
 }
 
 type ShopPayload = { revision: number; state: State; fresh: boolean }
@@ -75,36 +72,23 @@ type SaveResult =
 
 const MarketContext = createContext<MarketApi | null>(null)
 
-function readStored(key: string): unknown {
-  const raw = localStorage.getItem(key)
-  if (!raw) return null
-  return JSON.parse(raw) as unknown
-}
-
-function withPrices(state: Pick<State, 'products' | 'purchases' | 'movements'>): State {
-  const giftReady = state.products.some((product) => product.variants.some((variant) => variant.id === 'var-sp-10'))
-  return ensureState({
-    products: state.products,
-    purchases: state.purchases,
-    movements: state.movements,
+function emptyShop(): State {
+  return {
+    products: [],
+    purchases: [],
+    movements: [],
     buyers: [],
     orders: [],
-    offers: giftReady ? demoOffers() : [],
-  })
+    offers: [],
+  }
 }
 
-function readBrowserState(): State | null {
-  try {
-    const current = readStored(STORAGE_KEY)
-    if (isRecord(current) && current.version === 2 && isState(current.state)) return ensureState(current.state)
-    const legacy = readStored(LEGACY_KEY)
-    if (isRecord(legacy) && legacy.version === 1 && isRecord(legacy.state) && isCatalog(legacy.state)) {
-      return withPrices(legacy.state as Pick<State, 'products' | 'purchases' | 'movements'>)
-    }
-    return null
-  } catch {
-    return null
-  }
+function openOrderMail(state: State, order: CustomerOrder, event: 'placed' | 'delivered') {
+  const label = event === 'placed' ? 'Order placed' : 'Order delivered'
+  const lines = order.lines.map((line) => `• ${line.productName} · ${line.variantName}: ${line.quantity} × ₹${line.unitPrice}`).join('\n')
+  const gifts = order.offer?.kind === 'gift' ? `\nFree gifts:\n${order.offer.items.map((item) => `• ${item.productName} · ${item.variantName}: ${item.quantity}`).join('\n')}` : ''
+  const body = [`${label}: ${order.number}`, '', `Buyer: ${order.buyerName}`, '', 'Items:', lines || 'No items', gifts, '', `Total: ₹${order.total}`, `Paid: ₹${order.paid}`, `Payment: ${order.paymentMethod}`, order.comment ? `Note: ${order.comment}` : ''].filter(Boolean).join('\n')
+  return openMailto(state.seller?.email, `${state.seller?.businessName || 'Baji Market'}: ${label} ${order.number}`, body)
 }
 
 function parsePayload(value: unknown): ShopPayload | null {
@@ -176,16 +160,11 @@ async function fetchShop() {
   if (!payload) throw new Error('The shop data was not valid.')
   if (!payload.fresh) return { state: ensureState(payload.state), revision: payload.revision }
 
-  const local = readBrowserState()
-  const next = local ?? ensureState(payload.state)
+  const next = emptyShop()
   const saved = await saveShop(0, next)
   if (!saved.ok) {
     if ('conflict' in saved) return { state: ensureState(saved.conflict.state), revision: saved.conflict.revision }
     throw new Error(saved.error)
-  }
-  if (local) {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(LEGACY_KEY)
   }
   return { state: next, revision: saved.revision }
 }
@@ -201,7 +180,7 @@ function Boot({
 }) {
   return (
     <div className="boot" data-testid="boot">
-      <p className="wordmark">Market</p>
+      <p className="wordmark">Baji Market</p>
       <h1>{title}</h1>
       <p>{body}</p>
       {action && (
@@ -213,15 +192,48 @@ function Boot({
   )
 }
 
+function DuplicateDataToast({ onDismiss }: { onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDismiss, 5_000)
+    return () => window.clearTimeout(timer)
+  }, [onDismiss])
+
+  return (
+    <div className="duplicate-toast" role="alert" aria-live="assertive">
+      <div className="duplicate-toast-copy">
+        <strong>Duplicate data found</strong>
+        <span>This entry already exists.</span>
+      </div>
+      <button type="button" aria-label="Dismiss duplicate data message" onClick={onDismiss}>×</button>
+      <span className="duplicate-toast-progress" aria-hidden="true" />
+    </div>
+  )
+}
+
+function SavingOverlay() {
+  return (
+    <div className="saving-overlay" role="status" aria-live="assertive" aria-label="Saving data">
+      <div className="saving-dialog">
+        <span className="spinner" aria-hidden="true" />
+        <strong>Saving data</strong>
+        <span>Your changes are being saved.</span>
+      </div>
+    </div>
+  )
+}
+
 export function MarketProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [duplicateNotice, setDuplicateNotice] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
   const [bootError, setBootError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const stateRef = useRef<State | null>(null)
   const revisionRef = useRef(0)
   const generationRef = useRef(0)
   const chainRef = useRef(Promise.resolve())
+  const pendingSavesRef = useRef(0)
 
   const dismissNotice = useCallback(() => setNotice(null), [])
 
@@ -245,6 +257,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback((next: State) => {
     const generation = generationRef.current
+    pendingSavesRef.current += 1
+    setSaving(true)
     chainRef.current = chainRef.current
       .catch(() => undefined)
       .then(async () => {
@@ -268,13 +282,20 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         }
         setNotice(result.error)
       })
+      .finally(() => {
+        pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1)
+        if (pendingSavesRef.current === 0) setSaving(false)
+      })
   }, [])
 
   const api = useMemo<MarketApi | null>(() => {
     if (!state) return null
     const now = () => new Date().toISOString()
     function commit(result: Outcome, message: string): ActionResult {
-      if (!result.ok) return result
+      if (!result.ok) {
+        if (result.error === DUPLICATE_DATA_ERROR) setDuplicateNotice(Date.now())
+        return result
+      }
       stateRef.current = result.state
       setState(result.state)
       setNotice(message)
@@ -313,17 +334,30 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         commit(receivePurchase(stateRef.current ?? state, purchaseId, items, note, now()), 'Delivery added to stock.'),
       saveBuyerPurchase: (input) => {
         const result = createBuyerPurchase(stateRef.current ?? state, input, now())
-        if (!result.ok) return result
+        if (!result.ok) {
+          if (result.error === DUPLICATE_DATA_ERROR) setDuplicateNotice(Date.now())
+          return result
+        }
         stateRef.current = result.state
         setState(result.state)
-        setNotice('Buyer purchase recorded.')
+        const order = result.state.orders.find((item) => item.id === result.state.orders[0]?.id)
+        const emailOpened = order ? openOrderMail(result.state, order, 'placed') : false
+        setNotice(emailOpened ? 'Order placed. A seller email draft has opened.' : 'Order placed. Add a seller email to open an email draft.')
         persist(result.state)
         return { ok: true, buyerId: result.buyerId }
       },
       editBuyerPurchase: (orderId, input) =>
         commit(updatePurchase(stateRef.current ?? state, orderId, input, now()), 'Purchase updated.'),
-      setDeliveryStatus: (orderId, status) =>
-        commit(setOrderStatus(stateRef.current ?? state, orderId, status, now()), 'Delivery status updated.'),
+      setDeliveryStatus: (orderId, status) => {
+        const result = setOrderStatus(stateRef.current ?? state, orderId, status, now())
+        const action = commit(result, status === 'delivered' ? 'Order delivered.' : 'Delivery status updated.')
+        if (result.ok && status === 'delivered') {
+          const order = result.state.orders.find((item) => item.id === orderId)
+          const emailOpened = order ? openOrderMail(result.state, order, 'delivered') : false
+          if (emailOpened) setNotice('Order delivered. A seller email draft has opened.')
+        }
+        return action
+      },
       editBuyer: (buyerId, input) =>
         commit(updateBuyer(stateRef.current ?? state, buyerId, input, now()), 'Buyer updated.'),
       deleteBuyer: (buyerId) => commit(removeBuyer(stateRef.current ?? state, buyerId, now()), 'Buyer removed.'),
@@ -332,15 +366,6 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       removeOffer: (offerId) => commit(deleteOffer(stateRef.current ?? state, offerId), 'Offer removed.'),
       saveSeller: (input) => commit(updateSeller(stateRef.current ?? state, input), 'Seller info saved.'),
       importBuyer: (input) => commit(importBuyer(stateRef.current ?? state, input, now()), 'Buyer imported.'),
-      resetDemo: () => {
-        const fresh = seedState()
-        const seller = stateRef.current?.seller
-        if (seller) fresh.seller = seller
-        stateRef.current = fresh
-        setState(fresh)
-        setNotice('Sample catalog restored.')
-        persist(fresh)
-      },
     }
   }, [dismissNotice, notice, persist, state])
 
@@ -361,7 +386,13 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     )
   }
   if (!api) return <Boot title="Loading the shop" body="Opening the catalog from D1." />
-  return <MarketContext.Provider value={api}>{children}</MarketContext.Provider>
+  return (
+    <MarketContext.Provider value={api}>
+      {children}
+      {saving && <SavingOverlay />}
+      {duplicateNotice !== null && <DuplicateDataToast key={duplicateNotice} onDismiss={() => setDuplicateNotice(null)} />}
+    </MarketContext.Provider>
+  )
 }
 
 export function useMarket() {

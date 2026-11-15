@@ -164,12 +164,12 @@ export function importBuyer(state: State, input: BuyerInput, now: string): Outco
   const name = clean(input.name, 80)
   if (!name) return fail('Buyer name is required.')
   const next = structuredClone(state)
-  const existing = next.buyers.find((buyer) => buyer.phone && buyer.phone === clean(input.phone, 30))
+  const phone = clean(input.phone, 30)
+  const existing = next.buyers.find((buyer) => (phone && buyer.phone === phone) || buyer.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())
   if (existing) {
-    existing.name = name; existing.address = clean(input.address ?? '', 400); existing.note = clean(input.note, 300); existing.updatedAt = now
-  } else {
-    next.buyers.push({ id: `buyer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name, phone: clean(input.phone, 30), address: clean(input.address ?? '', 400), note: clean(input.note, 300), createdAt: now, updatedAt: now })
+    return fail('Duplicate data found.')
   }
+  next.buyers.push({ id: `buyer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name, phone, address: clean(input.address ?? '', 400), note: clean(input.note, 300), createdAt: now, updatedAt: now })
   return { ok: true, state: next }
 }
 
@@ -237,7 +237,7 @@ function releaseOrder(state: State, order: CustomerOrder, now: string): Outcome 
   let next = state
   for (const [variantId, held] of heldCounts(order)) {
     const place = findVariant(next, held.productId, variantId)
-    if (!place) return fail(`${order.buyerName}'s purchase includes an item that is no longer in the catalog.`)
+    if (!place) continue
     const result = moveStock(
       next,
       held.productId,
