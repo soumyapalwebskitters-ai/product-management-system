@@ -34,7 +34,7 @@ export function signed(delta: number) {
 }
 
 export function rupees(value: number) {
-  return `₹${value.toLocaleString('en-IN')}`
+  return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 const paymentLabels = {

@@ -203,7 +203,7 @@ export function findCatalogItem(state: State, productId: string, variantId: stri
 }
 
 export function offerSummary(offer: Offer, giftLabel: string) {
-  const amount = `₹${offer.minimumAmount.toLocaleString('en-IN')}`
+  const amount = `₹${offer.minimumAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   if (offer.reward === 'discount') {
     return `Spend ${amount} or more and the bill is ${offer.percent}% off.`
   }
