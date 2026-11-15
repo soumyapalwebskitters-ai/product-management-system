@@ -17,11 +17,20 @@ export function GalleryView() {
 
   function save() {
     if (!selectedId) { setError('Choose a product variant.'); return }
+    const cleanUrl = url.trim()
+    if (!cleanUrl) { setError('Paste a Google Drive image URL.'); return }
+    try {
+      const parsed = new URL(cleanUrl)
+      if (!/^https?:$/.test(parsed.protocol)) throw new Error('invalid protocol')
+    } catch {
+      setError('Enter a valid image URL.')
+      return
+    }
     const product = state.products.find((item) => item.variants.some((variant) => variant.id === selectedId))
     if (!product) { setError('Choose a valid product variant.'); return }
-    const result = addGalleryImage({ productId: product.id, variantId: selectedId, url: normalizeDriveImageUrl(url) })
+    const result = addGalleryImage({ productId: product.id, variantId: selectedId, url: normalizeDriveImageUrl(cleanUrl) })
     if (!result.ok) { setError(result.error); return }
-    setUrl(''); setError(null)
+    setUrl(''); setQuery(''); setSelectedId(null); setError(null)
   }
 
   return <section className="gallery-page">
