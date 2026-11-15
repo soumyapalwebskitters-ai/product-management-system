@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { Dialog } from './Dialog'
+import { SelectBox } from './SelectBox'
 
 const VIEW = 320
 const EXPORT = 720
@@ -12,34 +13,35 @@ function clamp(value: number, min: number, max: number) {
 function paint(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
-  size: number,
+  width: number,
+  height: number,
   zoom: number,
   rotation: number,
   x: number,
   y: number,
 ) {
-  ctx.clearRect(0, 0, size, size)
+  ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = '#1c1915'
-  ctx.fillRect(0, 0, size, size)
+  ctx.fillRect(0, 0, width, height)
   ctx.save()
-  ctx.translate(size / 2 + x, size / 2 + y)
+  ctx.translate(width / 2 + x, height / 2 + y)
   ctx.rotate((rotation * Math.PI) / 180)
   const quarterTurn = Math.abs(rotation % 180) === 90
   const boxW = quarterTurn ? img.naturalHeight : img.naturalWidth
   const boxH = quarterTurn ? img.naturalWidth : img.naturalHeight
-  const cover = Math.max(size / boxW, size / boxH)
+  const cover = Math.max(width / boxW, height / boxH)
   ctx.drawImage(img, (-img.naturalWidth * cover * zoom) / 2, (-img.naturalHeight * cover * zoom) / 2, img.naturalWidth * cover * zoom, img.naturalHeight * cover * zoom)
   ctx.restore()
 }
 
-function panLimit(img: HTMLImageElement, size: number, zoom: number, rotation: number) {
+function panLimit(img: HTMLImageElement, width: number, height: number, zoom: number, rotation: number) {
   const quarterTurn = Math.abs(rotation % 180) === 90
   const boxW = quarterTurn ? img.naturalHeight : img.naturalWidth
   const boxH = quarterTurn ? img.naturalWidth : img.naturalHeight
-  const cover = Math.max(size / boxW, size / boxH)
+  const cover = Math.max(width / boxW, height / boxH)
   return {
-    x: Math.max(0, (boxW * cover * zoom - size) / 2),
-    y: Math.max(0, (boxH * cover * zoom - size) / 2),
+    x: Math.max(0, (boxW * cover * zoom - width) / 2),
+    y: Math.max(0, (boxH * cover * zoom - height) / 2),
   }
 }
 
@@ -59,6 +61,7 @@ function PhotoEditor({
   const [zoom, setZoom] = useState(1)
   const [rotation, setRotation] = useState(0)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [aspect, setAspect] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const zoomId = useId()
 
@@ -81,17 +84,19 @@ function PhotoEditor({
     if (!canvas || !img || !ready) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const limit = panLimit(img, VIEW, zoom, rotation)
+    const height = Math.round(VIEW / aspect)
+    const limit = panLimit(img, VIEW, height, zoom, rotation)
     const x = clamp(offset.x, -limit.x, limit.x)
     const y = clamp(offset.y, -limit.y, limit.y)
-    paint(ctx, img, VIEW, zoom, rotation, x, y)
-  }, [offset, ready, rotation, zoom])
+    paint(ctx, img, VIEW, height, zoom, rotation, x, y)
+  }, [aspect, offset, ready, rotation, zoom])
 
   function move(event: ReactPointerEvent<HTMLCanvasElement>) {
     const img = imageRef.current
     const start = drag.current
     if (!img || !start) return
-    const limit = panLimit(img, VIEW, zoom, rotation)
+    const height = Math.round(VIEW / aspect)
+    const limit = panLimit(img, VIEW, height, zoom, rotation)
     setOffset({
       x: clamp(start.originX + event.clientX - start.x, -limit.x, limit.x),
       y: clamp(start.originY + event.clientY - start.y, -limit.y, limit.y),
@@ -103,15 +108,17 @@ function PhotoEditor({
     if (!img) return
     const canvas = document.createElement('canvas')
     canvas.width = EXPORT
-    canvas.height = EXPORT
+    canvas.height = Math.round(EXPORT / aspect)
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const scale = EXPORT / VIEW
-    const limit = panLimit(img, VIEW, zoom, rotation)
+    const viewHeight = Math.round(VIEW / aspect)
+    const limit = panLimit(img, VIEW, viewHeight, zoom, rotation)
     paint(
       ctx,
       img,
       EXPORT,
+      canvas.height,
       zoom,
       rotation,
       clamp(offset.x, -limit.x, limit.x) * scale,
@@ -138,7 +145,7 @@ function PhotoEditor({
           ref={canvasRef}
           className="photo-stage"
           width={VIEW}
-          height={VIEW}
+          height={Math.round(VIEW / aspect)}
           aria-label="Crop area"
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture(event.pointerId)
@@ -152,6 +159,15 @@ function PhotoEditor({
             drag.current = null
           }}
         />
+        <label className="field" htmlFor={`${zoomId}-aspect`}>
+          <span>Crop ratio</span>
+          <SelectBox id={`${zoomId}-aspect`} value={aspect} onChange={(event) => { setAspect(Number(event.target.value)); setOffset({ x: 0, y: 0 }) }}>
+            <option value="1">Square (1:1)</option>
+            <option value={4 / 3}>Landscape (4:3)</option>
+            <option value={16 / 9}>Wide (16:9)</option>
+            <option value={3 / 4}>Portrait (3:4)</option>
+          </SelectBox>
+        </label>
         <label className="field" htmlFor={zoomId}>
           <span>Zoom</span>
           <input

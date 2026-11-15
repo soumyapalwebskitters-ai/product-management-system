@@ -29,7 +29,7 @@ export async function readShop(db: Sql): Promise<{ revision: number; state: Stat
     `SELECT id, name, image, note, created_at AS createdAt, updated_at AS updatedAt, position FROM products`,
   )
   const variants = await db.all<VariantRow>(
-    `SELECT id, product_id AS productId, name, sku, items_per_box AS itemsPerBox, price,
+    `SELECT id, product_id AS productId, name, sku, image, items_per_box AS itemsPerBox, price,
             buying_price AS buyingPrice, purchase_unit AS purchaseUnit, selling_unit AS sellingUnit,
             current_stock AS currentStock, minimum_stock AS minimumStock, desired_stock AS desiredStock,
             position
@@ -122,13 +122,14 @@ export async function writeShop(db: Sql, state: State, revision: number) {
     statements.push(
       statement(
         `INSERT INTO variants (
-           id, product_id, name, sku, items_per_box, price, buying_price, purchase_unit, selling_unit, current_stock, minimum_stock, desired_stock, position
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           id, product_id, name, sku, image, items_per_box, price, buying_price, purchase_unit, selling_unit, current_stock, minimum_stock, desired_stock, position
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           variant.id,
           variant.productId,
           variant.name,
           variant.sku,
+          variant.image,
           variant.itemsPerBox,
           variant.price,
           variant.buyingPrice,

@@ -30,6 +30,7 @@ export type VariantRow = {
   buyingPrice: number
   purchaseUnit: 'box' | 'item'
   sellingUnit: 'box' | 'item'
+  image: string
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -266,6 +267,7 @@ export function toRows(state: State): DbRows {
         buyingPrice: variant.buyingPrice ?? 0,
         purchaseUnit: variant.purchaseUnit ?? 'box',
         sellingUnit: variant.sellingUnit ?? 'item',
+        image: variant.image ?? '',
         currentStock: variant.currentStock,
         minimumStock: variant.minimumStock,
         desiredStock: variant.desiredStock,
@@ -456,6 +458,7 @@ export function fromRows(rows: DbRows): State {
         ...(variant.buyingPrice ? { buyingPrice: variant.buyingPrice } : {}),
         purchaseUnit: variant.purchaseUnit,
         sellingUnit: variant.sellingUnit,
+        ...(variant.image ? { image: variant.image } : {}),
         currentStock: variant.currentStock,
         minimumStock: variant.minimumStock,
         desiredStock: variant.desiredStock,

@@ -9,6 +9,8 @@ export type Variant = {
   purchaseUnit?: 'box' | 'item'
   /** The unit buyers use when ordering this product. */
   sellingUnit?: 'box' | 'item'
+  /** Cropped photo for this specific variant. */
+  image?: string
   note?: string
   currentStock: number
   minimumStock: number
@@ -35,6 +37,7 @@ export type VariantInput = {
   buyingPrice?: number
   purchaseUnit?: 'box' | 'item'
   sellingUnit?: 'box' | 'item'
+  image?: string
   note?: string
   currentStock: number
   minimumStock: number

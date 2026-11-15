@@ -9,6 +9,7 @@ type DraftVariant = {
   key: string
   id?: string
   name: string
+  image: string
   sku: string
   itemsPerBox: string
   price: string
@@ -32,6 +33,7 @@ function blankVariant(usedSkus: Set<string>): DraftVariant {
   return {
     key: crypto.randomUUID(),
     name: '',
+    image: '',
     sku: generateSku(usedSkus),
     itemsPerBox: '1',
     price: '0',
@@ -106,6 +108,7 @@ function fromProduct(product: Product): DraftVariant[] {
     key: variant.id,
     id: variant.id,
     name: variant.name,
+    image: variant.image ?? '',
     sku: variant.sku,
     itemsPerBox: String(variant.itemsPerBox),
     price: String((variant.sellingUnit ?? 'item') === 'box' ? variant.price * variant.itemsPerBox : variant.price),
@@ -369,6 +372,7 @@ function VariantCard({
         </label>
         </div>
         <label className="field"><span>Variant note</span><textarea rows={2} value={variant.note} placeholder="Optional note" onChange={(event) => onChange({ note: event.target.value })} /></label>
+        <ProductImageField image={variant.image} label="Variant photo" testId={`${formId}-${variant.key}-photo`} onChange={(image) => onChange({ image })} />
       </section>
       <section className="form-group" hidden={Boolean(onlySection && onlySection !== 'purchase')}>
         <div className="review-section-heading"><h4 className="section-label">Purchase information</h4>{onEdit && <button type="button" className="btn secondary small" onClick={() => onEdit('purchase')}>Edit in wizard</button>}</div>
@@ -559,6 +563,7 @@ function buildInput(
       minimumStock: variant.minimumUnit === 'box' ? minimumStock * itemsPerBox : minimumStock,
       desiredStock: existing?.desiredStock ?? (variant.minimumUnit === 'box' ? minimumStock * itemsPerBox : minimumStock),
       note: variant.note.trim(),
+      image: variant.image,
     })
   }
 

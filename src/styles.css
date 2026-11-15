@@ -1371,9 +1371,13 @@ button .ui-icon, h2 .ui-icon, h3 .ui-icon, .search-input .ui-icon { margin-right
 .photo-actions { display: grid; gap: 6px; justify-items: start; }
 .photo-actions .hint { margin: 0; }
 .photo-editor { display: grid; gap: 12px; }
+.photo-editor .select-box { width: 100%; min-width: 0; background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+.photo-editor .select-box select { background: var(--surface); color: var(--ink); }
+.photo-editor .select-box option { background: var(--surface); color: var(--ink); }
 .photo-stage {
   width: min(320px, 100%);
   height: auto;
+  border: 2px solid var(--accent);
   border-radius: 12px;
   cursor: grab;
   touch-action: none;

@@ -111,6 +111,7 @@ function parseProduct(
 
   for (let index = 0; index < input.variants.length; index += 1) {
     const source = input.variants[index]
+    const existingVariant = existing?.find((variant) => variant.id === source.id)
     const variantName = source.name.trim()
     const sku = source.sku.trim()
     if (!variantName) return fail(`Enter a name for variant ${index + 1}.`)
@@ -145,6 +146,8 @@ function parseProduct(
     const buyingPrice = source.buyingPrice ?? 0
     const buyingError = money(buyingPrice, `Buying price for ${variantName}`)
     if (buyingError) return fail(buyingError)
+    const variantImage = cleanImage(source.image, existingVariant?.image ?? '')
+    if (!variantImage.ok) return fail(`Photo for ${variantName}: ${variantImage.error}`)
 
     variants.push({
       id: source.id,
@@ -155,6 +158,7 @@ function parseProduct(
       buyingPrice,
       purchaseUnit: source.purchaseUnit === 'item' ? 'item' : 'box',
       sellingUnit: source.sellingUnit === 'box' ? 'box' : 'item',
+      image: variantImage.image,
       currentStock: source.currentStock,
       minimumStock: source.minimumStock,
       desiredStock: source.desiredStock,
@@ -188,6 +192,7 @@ function toVariant(input: VariantInput): Variant {
     buyingPrice: input.buyingPrice ?? 0,
     purchaseUnit: input.purchaseUnit ?? 'box',
     sellingUnit: input.sellingUnit ?? 'item',
+    image: input.image ?? '',
     currentStock: input.currentStock,
     minimumStock: input.minimumStock,
     desiredStock: input.desiredStock,
