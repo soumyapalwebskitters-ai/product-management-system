@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 export type Variant = {
   id: string
   name: string
@@ -39,61 +38,6 @@ export type VariantInput = {
   purchaseUnit?: 'box' | 'item'
   sellingUnit?: 'box' | 'item'
   image?: string
-  note?: string
-  currentStock: number
-  minimumStock: number
-  desiredStock: number
-}
-
-export type ProductInput = {
-  name: string
-  image?: string
-  note?: string
-  variants: VariantInput[]
-}
-
-export type PurchaseStatus = 'ordered' | 'partial' | 'received'
-
-export type Purchase = {
-  id: string
-=======
-export type Variant = {
-  id: string
-  name: string
-  sku: string
-  itemsPerBox: number
-  price: number
-  /** What the shop pays for one item. */
-  buyingPrice?: number
-  purchaseUnit?: 'box' | 'item'
-  /** The unit buyers use when ordering this product. */
-  sellingUnit?: 'box' | 'item'
-  note?: string
-  currentStock: number
-  minimumStock: number
-  desiredStock: number
-}
-
-export type Product = {
-  id: string
-  name: string
-  /** Cropped product photo, as a JPEG data URL. */
-  image?: string
-  note?: string
-  variants: Variant[]
-  createdAt: string
-  updatedAt: string
-}
-
-export type VariantInput = {
-  id?: string
-  name: string
-  sku: string
-  itemsPerBox: number
-  price?: number
-  buyingPrice?: number
-  purchaseUnit?: 'box' | 'item'
-  sellingUnit?: 'box' | 'item'
   note?: string
   currentStock: number
   minimumStock: number
@@ -219,62 +163,6 @@ export type CustomerOrder = {
   comment: string
   createdAt: string
   updatedAt: string
-}
-
-export type OfferGift = {
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
-  productId: string
-  variantId: string
-  quantity: number
-<<<<<<< HEAD
-  unitPrice: number
-}
-
-export type GiftLine = {
-  productId: string
-  variantId: string
-  productName: string
-  variantName: string
-  sku: string
-  quantity: number
-  unitPrice?: number
-}
-
-export type RecordedOffer =
-  | {
-      kind: 'discount'
-      offerId: string
-      offerName: string
-      percent: number
-      amount: number
-    }
-  | {
-      kind: 'gift'
-      offerId: string
-      offerName: string
-      items: GiftLine[]
-    }
-
-export type CustomerOrder = {
-  id: string
-  /** Short unique bill number, such as ORD-1004. */
-  number: string
-  buyerId: string
-  buyerName: string
-  status: OrderStatus
-  lines: OrderLine[]
-  subtotal: number
-  offer: RecordedOffer | null
-  total: number
-  /** Rupees already received toward this bill. */
-  paid: number
-  paymentMethod: PaymentMethod
-  comment: string
-  createdAt: string
-  updatedAt: string
-=======
-  quantityUnit?: 'box' | 'item'
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
 }
 
 export type OfferGift = {

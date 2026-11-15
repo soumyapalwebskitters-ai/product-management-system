@@ -9,7 +9,6 @@ export function SellerInfoView() {
   const [name, setName] = useState(seller?.name ?? '')
   const [email, setEmail] = useState(seller?.email ?? '')
   const [phone, setPhone] = useState(seller?.phone ?? '')
-<<<<<<< HEAD
   const [businessName, setBusinessName] = useState(seller?.businessName ?? '')
   const [address, setAddress] = useState(seller?.address ?? '')
   const [gst, setGst] = useState(seller?.gst ?? '')
@@ -19,17 +18,6 @@ export function SellerInfoView() {
   const [instagram, setInstagram] = useState(seller?.instagram ?? '')
   const [youtube, setYoutube] = useState(seller?.youtube ?? '')
   const [whatsapp, setWhatsapp] = useState(seller?.whatsapp ?? '')
-=======
-  const [businessName, setBusinessName] = useState(seller?.businessName ?? '')
-  const [address, setAddress] = useState(seller?.address ?? '')
-  const [gst, setGst] = useState(seller?.gst ?? '')
-  const [profileImage, setProfileImage] = useState(seller?.profileImage ?? '')
-  const [logo, setLogo] = useState(seller?.logo ?? '')
-  const [facebook, setFacebook] = useState(seller?.facebook ?? '')
-  const [instagram, setInstagram] = useState(seller?.instagram ?? '')
-  const [youtube, setYoutube] = useState(seller?.youtube ?? '')
-  const [whatsapp, setWhatsapp] = useState(seller?.whatsapp ?? '')
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
   const [error, setError] = useState<string | null>(null)
 
   function submit(event: FormEvent) {
@@ -38,7 +26,6 @@ export function SellerInfoView() {
       name,
       email,
       phone,
-<<<<<<< HEAD
       businessName,
       address,
       gst,
@@ -78,47 +65,6 @@ export function SellerInfoView() {
                 onChange={(event) => setBusinessName(event.target.value)}
               />
             </label>
-=======
-      businessName,
-      address,
-      gst,
-      profileImage,
-      logo,
-      facebook,
-      instagram,
-      youtube,
-      whatsapp,
-    })
-    setError(result.ok ? null : result.error)
-  }
-
-  return (
-    <section>
-      <div className="page-head">
-        <div>
-          <h2>Seller info</h2>
-          <p className="lede">Save the shop profile here, then edit it whenever the details change.</p>
-        </div>
-      </div>
-      <form className="profile-form" onSubmit={submit}>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        <section className="form-group">
-          <h3 className="section-label">Business</h3>
-          <div className="fields">
-            <label className="field" htmlFor={`${formId}-business`}>
-              <span>Business name</span>
-              <input
-                id={`${formId}-business`}
-                value={businessName}
-                autoComplete="organization"
-                onChange={(event) => setBusinessName(event.target.value)}
-              />
-            </label>
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
             <label className="field" htmlFor={`${formId}-name`}>
               <span>Seller name</span>
               <input
@@ -139,20 +85,6 @@ export function SellerInfoView() {
                 onChange={(event) => setEmail(event.target.value)}
               />
             </label>
-<<<<<<< HEAD
-            <label className="field" htmlFor={`${formId}-email`}>
-              <span>Order notification email</span>
-              <input
-                id={`${formId}-email`}
-                type="email"
-                value={email}
-                autoComplete="email"
-                placeholder="you@example.com"
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </label>
-=======
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
             <label className="field" htmlFor={`${formId}-phone`}>
               <span>Phone number</span>
               <input
@@ -165,7 +97,6 @@ export function SellerInfoView() {
                 onChange={(event) => setPhone(event.target.value)}
               />
             </label>
-<<<<<<< HEAD
           </div>
           <label className="field" htmlFor={`${formId}-address`}>
             <span>Address</span>
@@ -188,30 +119,6 @@ export function SellerInfoView() {
             />
           </label>
         </section>
-=======
-          </div>
-          <label className="field" htmlFor={`${formId}-address`}>
-            <span>Address</span>
-            <textarea
-              id={`${formId}-address`}
-              value={address}
-              rows={3}
-              autoComplete="street-address"
-              onChange={(event) => setAddress(event.target.value)}
-            />
-          </label>
-          <label className="field" htmlFor={`${formId}-gst`}>
-            <span>GST number</span>
-            <input
-              id={`${formId}-gst`}
-              value={gst}
-              autoComplete="off"
-              placeholder="22AAAAA0000A1Z5"
-              onChange={(event) => setGst(event.target.value)}
-            />
-          </label>
-        </section>
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
         <section className="form-group profile-photos">
           <h3 className="section-label">Photos</h3>
           <div className="fields">

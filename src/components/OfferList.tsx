@@ -42,8 +42,4 @@ export function OfferList({ state, editable = false, onEdit, onDelete }: {
       </div>}
     </article>
   })}</div>
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b

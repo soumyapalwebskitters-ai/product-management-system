@@ -57,14 +57,6 @@ function money(value: number, label: string) {
   }
   return null
 }
-<<<<<<< HEAD
-
-function money(value: number, label: string) {
-  if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.round(value * 100))) {
-    return `${label} must be a valid amount.`
-  }
-  return null
-}
 
 function locate(state: State, productId: string, variantId: string) {
   const productIndex = state.products.findIndex((product) => product.id === productId)
@@ -157,97 +149,6 @@ function parseProduct(
     const variantImage = cleanImage(source.image, existingVariant?.image ?? '')
     if (!variantImage.ok) return fail(`Photo for ${variantName}: ${variantImage.error}`)
 
-=======
-
-function locate(state: State, productId: string, variantId: string) {
-  const productIndex = state.products.findIndex((product) => product.id === productId)
-  if (productIndex < 0) return null
-  const variantIndex = state.products[productIndex].variants.findIndex(
-    (variant) => variant.id === variantId,
-  )
-  if (variantIndex < 0) return null
-  return { productIndex, variantIndex }
-}
-
-function skuKey(sku: string) {
-  return sku.trim().toLowerCase()
-}
-
-function purchaseStatus(ordered: number, received: number): Purchase['status'] {
-  if (received <= 0) return 'ordered'
-  if (received < ordered) return 'partial'
-  return 'received'
-}
-
-const MAX_IMAGE = 1_200_000
-
-function cleanImage(value: string | undefined, fallback: string) {
-  if (value === undefined) return { ok: true as const, image: fallback }
-  const image = value.trim()
-  if (!image) return { ok: true as const, image: '' }
-  if (!image.startsWith('data:image/') || image.length > MAX_IMAGE) {
-    return { ok: false as const, error: 'Use a cropped product photo.' }
-  }
-  return { ok: true as const, image }
-}
-
-function parseProduct(
-  input: ProductInput,
-  existing: Variant[] | null,
-  currentImage = '',
-  currentNote = '',
-): { ok: true; name: string; image: string; note: string; variants: VariantInput[] } | { ok: false; error: string } {
-  const name = input.name.trim()
-  if (!name) return fail('Enter a product name.')
-  if (name.length > 80) return fail('Product name must be 80 characters or fewer.')
-  const image = cleanImage(input.image, currentImage)
-  if (!image.ok) return image
-  const note = input.note === undefined ? currentNote : input.note.trim()
-  if (note.length > 400) return fail('The note must be 400 characters or fewer.')
-  if (input.variants.length === 0) return fail('Add at least one variant.')
-
-  const variants: VariantInput[] = []
-  const seenIds = new Set<string>()
-  const seenSkus = new Set<string>()
-
-  for (let index = 0; index < input.variants.length; index += 1) {
-    const source = input.variants[index]
-    const variantName = source.name.trim()
-    const sku = source.sku.trim()
-    if (!variantName) return fail(`Enter a name for variant ${index + 1}.`)
-    if (variantName.length > 80) return fail(`${variantName} must be 80 characters or fewer.`)
-    if (!sku) return fail(`Enter a SKU for ${variantName}.`)
-    if (sku.length > 40) return fail(`SKU ${sku} must be 40 characters or fewer.`)
-
-    const boxError = wholeNumber(source.itemsPerBox, `Items per box for ${variantName}`, 1)
-    if (boxError) return fail(boxError)
-    const stockError = wholeNumber(source.currentStock, `Current stock for ${variantName}`, 0)
-    if (stockError) return fail(stockError)
-    const minimumError = wholeNumber(source.minimumStock, `Minimum stock for ${variantName}`, 0)
-    if (minimumError) return fail(minimumError)
-    const desiredError = wholeNumber(source.desiredStock, `Desired stock for ${variantName}`, 0)
-    if (desiredError) return fail(desiredError)
-
-    if (source.id) {
-      if (seenIds.has(source.id)) return fail('A variant was included twice.')
-      seenIds.add(source.id)
-      if (!existing?.some((variant) => variant.id === source.id)) {
-        return fail('A variant does not belong to this product.')
-      }
-    }
-
-    const key = skuKey(sku)
-    if (seenSkus.has(key)) return fail(`SKU ${sku} is used more than once.`)
-    seenSkus.add(key)
-
-    const price = source.price ?? 0
-    const priceError = money(price, `Selling price for ${variantName}`)
-    if (priceError) return fail(priceError)
-    const buyingPrice = source.buyingPrice ?? 0
-    const buyingError = money(buyingPrice, `Buying price for ${variantName}`)
-    if (buyingError) return fail(buyingError)
-
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
     variants.push({
       id: source.id,
       name: variantName,
@@ -257,15 +158,11 @@ function parseProduct(
       buyingPrice,
       purchaseUnit: source.purchaseUnit === 'item' ? 'item' : 'box',
       sellingUnit: source.sellingUnit === 'box' ? 'box' : 'item',
-<<<<<<< HEAD
       image: variantImage.image,
-=======
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
       currentStock: source.currentStock,
       minimumStock: source.minimumStock,
       desiredStock: source.desiredStock,
       note: source.note?.trim() ?? '',
-<<<<<<< HEAD
     })
   }
 
@@ -291,46 +188,15 @@ function toVariant(input: VariantInput): Variant {
     name: input.name,
     sku: input.sku,
     itemsPerBox: input.itemsPerBox,
-=======
-    })
-  }
-
-  return { ok: true, name, image: image.image, note, variants }
-}
-
-function skuClash(state: State, variants: VariantInput[], ignoreIds: Set<string>) {
-  for (const variant of variants) {
-    const key = skuKey(variant.sku)
-    const clash = state.products.some((product) =>
-      product.variants.some(
-        (existing) => skuKey(existing.sku) === key && !ignoreIds.has(existing.id),
-      ),
-    )
-    if (clash) return `SKU ${variant.sku} is already used.`
-  }
-  return null
-}
-
-function toVariant(input: VariantInput): Variant {
-  return {
-    id: input.id ?? createId(),
-    name: input.name,
-    sku: input.sku,
-    itemsPerBox: input.itemsPerBox,
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
     price: input.price ?? 0,
     buyingPrice: input.buyingPrice ?? 0,
     purchaseUnit: input.purchaseUnit ?? 'box',
     sellingUnit: input.sellingUnit ?? 'item',
-<<<<<<< HEAD
     image: input.image ?? '',
-=======
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
     currentStock: input.currentStock,
     minimumStock: input.minimumStock,
     desiredStock: input.desiredStock,
     note: input.note ?? '',
-<<<<<<< HEAD
   }
 }
 
@@ -421,118 +287,10 @@ export function catalogStats(state: State) {
 }
 
 export function createProduct(state: State, input: ProductInput, now: string): Outcome {
-=======
-  }
-}
-
-function stockMovement(
-  product: Product,
-  variant: Variant,
-  previousStock: number,
-  nextStock: number,
-  type: Movement['type'],
-  note: string,
-  now: string,
-  purchaseId?: string,
-): Movement {
-  return {
-    id: createId(),
-    type,
-    productId: product.id,
-    variantId: variant.id,
-    productName: product.name,
-    variantName: variant.name,
-    sku: variant.sku,
-    delta: nextStock - previousStock,
-    previousStock,
-    newStock: nextStock,
-    note,
-    createdAt: now,
-    purchaseId,
-  }
-}
-
-export function stockStatus(variant: Variant): StockStatus {
-  if (variant.currentStock < variant.minimumStock) {
-    return variant.currentStock <= 0 ? 'out' : 'low'
-  }
-  return 'ok'
-}
-
-export function onOrderItems(state: State, variantId: string) {
-  return state.purchases
-    .filter((purchase) => purchase.variantId === variantId && purchase.status !== 'received')
-    .reduce(
-      (sum, purchase) => sum + Math.max(0, purchase.orderedItems - purchase.receivedItems),
-      0,
-    )
-}
-
-export function remainingItems(purchase: Purchase) {
-  return Math.max(0, purchase.orderedItems - purchase.receivedItems)
-}
-
-export function buyRows(state: State): BuyRow[] {
-  const rows: BuyRow[] = []
-  for (const product of state.products) {
-    for (const variant of product.variants) {
-      if (!needsRestock(variant.currentStock, variant.minimumStock)) continue
-      rows.push({
-        productId: product.id,
-        productName: product.name,
-        variant,
-        calc: calcPurchase(variant.currentStock, variant.minimumStock, variant.itemsPerBox),
-        onOrderItems: onOrderItems(state, variant.id),
-        status: variant.currentStock <= 0 ? 'out' : 'low',
-      })
-    }
-  }
-  rows.sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'out' ? -1 : 1
-    const byProduct = a.productName.localeCompare(b.productName)
-    if (byProduct !== 0) return byProduct
-    return a.variant.name.localeCompare(b.variant.name)
-  })
-  return rows
-}
-
-export function catalogStats(state: State) {
-  let variants = 0
-  let low = 0
-  let out = 0
-  for (const product of state.products) {
-    for (const variant of product.variants) {
-      variants += 1
-      const status = stockStatus(variant)
-      if (status === 'low') low += 1
-      if (status === 'out') out += 1
-    }
-  }
-  return { products: state.products.length, variants, low, out }
-}
-
-export function createProduct(state: State, input: ProductInput, now: string): Outcome {
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
   const parsed = parseProduct(input, null)
   if (!parsed.ok) return parsed
   if (state.products.some((product) => product.name.trim().toLocaleLowerCase() === parsed.name.toLocaleLowerCase())) {
     return fail('Duplicate data found.')
-<<<<<<< HEAD
-  }
-  const clash = skuClash(state, parsed.variants, new Set())
-  if (clash) return fail(clash)
-
-  const next = structuredClone(state)
-  const product: Product = {
-    id: createId(),
-    name: parsed.name,
-    image: parsed.image,
-    note: parsed.note,
-    variants: parsed.variants.map(toVariant),
-    createdAt: now,
-    updatedAt: now,
-=======
->>>>>>> 1e93a50f783b841383173e99bc31d39d2d1aeb4b
   }
   const clash = skuClash(state, parsed.variants, new Set())
   if (clash) return fail(clash)
