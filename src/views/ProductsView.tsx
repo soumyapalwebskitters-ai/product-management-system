@@ -7,7 +7,6 @@ import { rupees } from '../format'
 import { calcPurchase } from '../purchase'
 import { catalogStats, onOrderItems, stockStatus } from '../inventory'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
-import { ProductPhoto } from '../components/ProductImageField'
 import { Icon } from '../components/Icon'
 import { matchesQuery, type SearchMode } from '../search'
 import { useMarket } from '../store'
@@ -182,7 +181,7 @@ export function ProductsView() {
                     <tr key={variant.id} className={`${index === 0 ? 'product-group-start ' : ''}${status === 'ok' ? '' : status}`.trim() || undefined}>
                       {index === 0 && (
                         <td data-label="Product" className="product-cell" rowSpan={variants.length}>
-                          <span className="item-with-photo"><ProductPhoto src={product.image ?? ''} name={product.name} /><strong>{product.name}</strong></span>
+                          <strong>{product.name}</strong>
                           {product.note && <div className="pending">{product.note}</div>}
                           <div className="row-actions">
                             <button type="button" className="btn secondary small icon-action" aria-label="Edit product" title="Edit product" onClick={() => setEditing(product)}>
