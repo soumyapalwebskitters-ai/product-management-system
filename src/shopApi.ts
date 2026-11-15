@@ -10,6 +10,7 @@ export async function handleState(method: string, body: unknown, db: Sql) {
     return { status: 405, body: { error: 'Method not allowed.' } }
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
+    console.error('Shop state request failed', error)
     const errorText = message.includes('no such table')
       ? 'D1 tables are missing. Apply the database migrations and reload.'
       : 'Could not use the shop database.'
