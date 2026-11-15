@@ -1,4 +1,4 @@
-import { handleState } from '../src/shopApi'
+import { handleGallery, handleState } from '../src/shopApi'
 import { createBuyerAccount, currentAccount, expiredSessionCookie, login, loginSeller, logout, resetSellerPassword, sellerExists, sessionCookie, setupSeller } from './auth'
 import type { Sql, SqlStatement, SqlValue } from '../src/sql'
 
@@ -60,6 +60,12 @@ export default {
     const db = d1(env.DB)
     if (url.pathname === '/api/gallery-image' && request.method === 'GET') {
       try { return await galleryImage(request) } catch { return new Response('Image could not be loaded.', { status: 502 }) }
+    }
+    if (url.pathname === '/api/gallery' && request.method === 'POST') {
+      const parsed = await requestBody(request)
+      if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
+      const result = await handleGallery(request.method, parsed.body, db)
+      return json(result.body, result.status)
     }
     if (url.pathname === '/api/auth/bootstrap' && request.method === 'GET') {
       return json({ sellerSetupRequired: !(await sellerExists(db)) })

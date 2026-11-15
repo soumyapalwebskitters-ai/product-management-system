@@ -62,7 +62,7 @@ type MarketApi = {
   removeOffer: (offerId: string) => ActionResult
   saveSeller: (input: SellerProfile) => ActionResult
   importBuyer: (input: BuyerInput) => ActionResult
-  addGalleryImage: (input: Omit<GalleryImage, 'id' | 'createdAt'>) => ActionResult
+  addGalleryImage: (input: Omit<GalleryImage, 'id' | 'createdAt'>) => Promise<ActionResult>
   removeGalleryImage: (id: string) => ActionResult
 }
 
@@ -370,7 +370,30 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       removeOffer: (offerId) => commit(deleteOffer(stateRef.current ?? state, offerId), 'Offer removed.'),
       saveSeller: (input) => commit(updateSeller(stateRef.current ?? state, input), 'Seller info saved.'),
       importBuyer: (input) => commit(importBuyer(stateRef.current ?? state, input, now()), 'Buyer imported.'),
-      addGalleryImage: (input) => commit(addGalleryImage(stateRef.current ?? state, input, now()), 'Gallery image added.'),
+      addGalleryImage: async (input) => {
+        const result = addGalleryImage(stateRef.current ?? state, input, now())
+        if (!result.ok) {
+          if (result.error === DUPLICATE_DATA_ERROR) setDuplicateNotice(Date.now())
+          return result
+        }
+        const image = result.state.gallery?.[0]
+        if (!image) return { ok: false, error: 'Gallery image data was not created.' }
+        pendingSavesRef.current += 1
+        setSaving(true)
+        try {
+          const response = await fetch('/api/gallery', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ revision: revisionRef.current, image }) })
+          const body = await response.json().catch(() => null)
+          if (!response.ok) return { ok: false, error: await errorMessage(body, 'Could not save gallery image.') }
+          if (isRecord(body) && typeof body.revision === 'number') revisionRef.current = body.revision
+          stateRef.current = result.state
+          setState(result.state)
+          setNotice('Gallery image added.')
+          return { ok: true }
+        } finally {
+          pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1)
+          if (pendingSavesRef.current === 0) setSaving(false)
+        }
+      },
       removeGalleryImage: (id) => commit(removeGalleryImage(stateRef.current ?? state, id), 'Gallery image removed.'),
     }
   }, [dismissNotice, notice, persist, state])
