@@ -1,7 +1,6 @@
 import { useId, useRef, useState, type FormEvent } from 'react'
 import { boxesLabel, itemsLabel, parseWhole } from '../format'
 import { calcPurchase, needsRestock } from '../purchase'
-import { ProductImageField } from './ProductImageField'
 import { DUPLICATE_DATA_ERROR, type ActionResult } from '../store'
 import type { Product, ProductInput, VariantInput } from '../types'
 
@@ -144,7 +143,7 @@ export function ProductForm({
 }) {
   const formId = useId()
   const [name, setName] = useState(product?.name ?? '')
-  const [image, setImage] = useState(product?.image ?? '')
+  const [image] = useState(product?.image ?? '')
   const [note, setNote] = useState(product?.note ?? '')
   const [variants, setVariants] = useState<DraftVariant[]>(
     product ? fromProduct(product) : [blankVariant(new Set(knownSkus.map((sku) => sku.toLowerCase())))],
@@ -237,7 +236,6 @@ export function ProductForm({
             onChange={(event) => setName(event.target.value)}
           />
         </label>
-        <ProductImageField image={image} onChange={setImage} />
         <label className="field" htmlFor={`${formId}-note`}>
           <span>Note</span>
           <textarea
@@ -372,7 +370,6 @@ function VariantCard({
         </label>
         </div>
         <label className="field"><span>Variant note</span><textarea rows={2} value={variant.note} placeholder="Optional note" onChange={(event) => onChange({ note: event.target.value })} /></label>
-        <ProductImageField image={variant.image} label="Variant photo" testId={`${formId}-${variant.key}-photo`} onChange={(image) => onChange({ image })} />
       </section>
       <section className="form-group" hidden={Boolean(onlySection && onlySection !== 'purchase')}>
         <div className="review-section-heading"><h4 className="section-label">Purchase information</h4>{onEdit && <button type="button" className="btn secondary small" onClick={() => onEdit('purchase')}>Edit in wizard</button>}</div>

@@ -252,6 +252,10 @@ function isSeller(value: unknown): value is SellerProfile {
   )
 }
 
+function isGalleryImage(value: unknown) {
+  return isRecord(value) && typeof value.id === 'string' && typeof value.productId === 'string' && typeof value.variantId === 'string' && typeof value.url === 'string' && value.url.length <= 2_000 && typeof value.createdAt === 'string'
+}
+
 export function isState(value: unknown): value is State {
   if (!isRecord(value) || !isCatalog(value)) return false
   return (
@@ -261,6 +265,7 @@ export function isState(value: unknown): value is State {
     value.orders.every(isCustomerOrder) &&
     Array.isArray(value.offers) &&
     value.offers.every(isOffer) &&
+    (value.gallery === undefined || (Array.isArray(value.gallery) && value.gallery.every(isGalleryImage))) &&
     (value.seller === undefined || isSeller(value.seller))
   )
 }
@@ -291,6 +296,7 @@ export function ensureState(state: State): State {
     ...state,
     products: pricedProducts(state.products),
     buyers: state.buyers.map((buyer) => ({ ...buyer, address: buyer.address ?? '' })),
+    gallery: state.gallery ?? [],
     orders: withOrderNumbers(
       state.orders.map((order) => ({
         ...order,

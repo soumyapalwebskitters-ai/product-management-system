@@ -8,6 +8,7 @@ import type {
   RecordedOffer,
   SellerProfile,
   State,
+  GalleryImage,
 } from './types'
 
 export type ProductRow = {
@@ -165,6 +166,8 @@ export type SellerRow = {
   whatsapp: string
 }
 
+export type GalleryRow = GalleryImage & { position: number }
+
 export type DbRows = {
   products: ProductRow[]
   variants: VariantRow[]
@@ -177,6 +180,7 @@ export type DbRows = {
   offers: OfferRow[]
   offerGifts: OfferGiftRow[]
   seller: SellerRow | null
+  gallery: GalleryRow[]
 }
 
 function ordered<T extends { position: number }>(rows: T[]) {
@@ -246,6 +250,7 @@ function sellerFrom(row: SellerRow | null): SellerProfile | undefined {
 export function toRows(state: State): DbRows {
   const products: ProductRow[] = []
   const variants: VariantRow[] = []
+  const gallery: GalleryRow[] = (state.gallery ?? []).map((item, position) => ({ ...item, position }))
   state.products.forEach((product, position) => {
     products.push({
       id: product.id,
@@ -372,6 +377,7 @@ export function toRows(state: State): DbRows {
     offers,
     offerGifts,
     seller: sellerRow(state),
+    gallery,
   }
 }
 
@@ -464,6 +470,7 @@ export function fromRows(rows: DbRows): State {
         desiredStock: variant.desiredStock,
       })),
     })),
+    gallery: ordered(rows.gallery).map(({ position: _position, ...image }) => image),
     purchases: ordered(rows.purchases).map(({ position: _position, ...purchase }) => purchase),
     movements: ordered(rows.movements).map((movement) => {
       const next: Movement = {

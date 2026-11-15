@@ -15,9 +15,10 @@ import { SettingsView } from './views/SettingsView'
 import { StockView } from './views/StockView'
 import { SellerBuyersView } from './views/SellerBuyersView'
 import { Icon } from './components/Icon'
+import { GalleryView } from './views/GalleryView'
 
 type Role = 'seller' | 'buyer'
-type SellerView = 'products' | 'glance' | 'stock' | 'buy' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile' | 'buyers' | 'settings'
+type SellerView = 'products' | 'glance' | 'gallery' | 'stock' | 'buy' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile' | 'buyers' | 'settings'
 
 type Route =
   | { role: 'seller'; view: SellerView }
@@ -26,6 +27,7 @@ type Route =
 
 const sellerLinks: Array<{ id: SellerView; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
   { id: 'products', label: 'All products', icon: 'box' }, { id: 'glance', label: 'Product at a glance', icon: 'eye' },
+  { id: 'gallery', label: 'Gallery', icon: 'eye' },
   { id: 'stock', label: 'Add / remove stock', icon: 'box' },
   { id: 'buy', label: 'Need to buy', icon: 'cart' },
   { id: 'delivery', label: 'Delivery', icon: 'truck' }, { id: 'recent', label: 'Last added', icon: 'clock' },
@@ -36,7 +38,7 @@ const sellerLinks: Array<{ id: SellerView; label: string; icon: Parameters<typeo
 ]
 
 const sellerGroups = [
-  { label: 'Catalog', links: ['products', 'glance', 'recent'] },
+  { label: 'Catalog', links: ['products', 'glance', 'gallery', 'recent'] },
   { label: 'Stock', links: ['stock', 'buy', 'suppliers'] },
   { label: 'Orders', links: ['delivery', 'offers'] },
   { label: 'Business', links: ['profile', 'buyers'] },
@@ -51,6 +53,7 @@ function readRoute(): Route {
   const view = parts[0] === 'seller' ? parts[1] : parts[0]
   if (!parts.length) return { role: 'buyer', view: 'buyers', buyerId: null }
   if (view === 'glance') return { role: 'seller', view: 'glance' }
+  if (view === 'gallery') return { role: 'seller', view: 'gallery' }
   if (view === 'stock') return { role: 'seller', view: 'stock' }
   if (view === 'settings') return { role: 'seller', view: 'settings' }
   if (view === 'buyers') return { role: 'seller', view: 'buyers' }
@@ -216,6 +219,7 @@ export function App() {
         {locked ? <section className="seller-lock"><h2><Icon name="lock" /> Seller access</h2>{!sellerSessionChecked ? <p>Checking seller session…</p> : <><p>Enter the seller password to continue.</p>{passwordError && <p className="error">{passwordError}</p>}<form onSubmit={async (event) => { event.preventDefault(); if (!password || sellerLoginPending) { if (!password) setPasswordError('Enter the seller password.'); return } setSellerLoginPending(true); try { const response = await fetch('/api/auth/seller/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) }); const body = await response.json().catch(() => null); if (!response.ok) { setPasswordError(typeof body?.error === 'string' ? body.error : 'Could not unlock Seller.'); return } setPassword(''); setPasswordError(''); setSellerUnlocked(true); setSellerSessionChecked(true) } catch { setPasswordError('Could not reach Seller access.') } finally { setSellerLoginPending(false) } }}><label className="field">Seller password<input type="password" autoFocus autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="btn" type="submit" disabled={sellerLoginPending}>{sellerLoginPending ? <><span className="spinner" aria-hidden="true" /> Checking…</> : <><Icon name="unlock" /> Unlock seller</>}</button></form></>}</section> : null}
         {!locked && route.role === 'seller' && route.view === 'products' && <ProductsView />}
         {!locked && route.role === 'seller' && route.view === 'glance' && <GlanceView />}
+        {!locked && route.role === 'seller' && route.view === 'gallery' && <GalleryView />}
         {!locked && route.role === 'seller' && route.view === 'stock' && <StockView />}
         {!locked && route.role === 'seller' && route.view === 'settings' && <SettingsView />}
         {!locked && route.role === 'seller' && route.view === 'buyers' && <SellerBuyersView />}

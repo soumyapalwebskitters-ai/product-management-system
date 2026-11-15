@@ -138,7 +138,7 @@ export function GlanceView() {
                   <tr key={`${product.id}-${variant.name}-${index}`} className={index === 0 ? 'product-group-start' : undefined}>
                     {index === 0 && <td data-label="Product" rowSpan={variants.length}><strong>{product.name}</strong></td>}
                     {index === 0 && <td data-label="Image" rowSpan={variants.length}>{product.image ? <ProductPhoto src={product.image} name={product.name} /> : '—'}</td>}
-                    <td data-label="Variant">{variant.name || 'Standard'}</td><td data-label="Variant image">{variant.image ? <ProductPhoto src={variant.image} name={`${product.name} ${variant.name || 'Standard'}`} /> : 'â€”'}</td>
+                    <td data-label="Variant">{variant.name || 'Standard'}</td><td data-label="Variant image">{variant.image ? <ProductPhoto src={variant.image} name={`${product.name} ${variant.name || 'Standard'}`} /> : '-'}</td>
                     <td data-label="Selling price" className="num">{sellingText(variant)}</td>
                   </tr>
                 )),

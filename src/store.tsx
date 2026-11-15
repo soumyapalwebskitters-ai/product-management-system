@@ -33,7 +33,8 @@ import { deleteOffer, upsertOffer, type OfferInput } from './offers'
 import { ensureState, isRecord, isState } from './parseState'
 import { updateSeller } from './seller'
 import { openMailto } from './mailto'
-import type { CustomerOrder, OrderStatus, ProductInput, PurchaseInput, SellerProfile, State } from './types'
+import { addGalleryImage, removeGalleryImage } from './gallery'
+import type { CustomerOrder, GalleryImage, OrderStatus, ProductInput, PurchaseInput, SellerProfile, State } from './types'
 import type { BuyerInput } from './orders'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
@@ -61,6 +62,8 @@ type MarketApi = {
   removeOffer: (offerId: string) => ActionResult
   saveSeller: (input: SellerProfile) => ActionResult
   importBuyer: (input: BuyerInput) => ActionResult
+  addGalleryImage: (input: Omit<GalleryImage, 'id' | 'createdAt'>) => ActionResult
+  removeGalleryImage: (id: string) => ActionResult
 }
 
 type ShopPayload = { revision: number; state: State; fresh: boolean }
@@ -80,6 +83,7 @@ function emptyShop(): State {
     buyers: [],
     orders: [],
     offers: [],
+    gallery: [],
   }
 }
 
@@ -366,6 +370,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       removeOffer: (offerId) => commit(deleteOffer(stateRef.current ?? state, offerId), 'Offer removed.'),
       saveSeller: (input) => commit(updateSeller(stateRef.current ?? state, input), 'Seller info saved.'),
       importBuyer: (input) => commit(importBuyer(stateRef.current ?? state, input, now()), 'Buyer imported.'),
+      addGalleryImage: (input) => commit(addGalleryImage(stateRef.current ?? state, input, now()), 'Gallery image added.'),
+      removeGalleryImage: (id) => commit(removeGalleryImage(stateRef.current ?? state, id), 'Gallery image removed.'),
     }
   }, [dismissNotice, notice, persist, state])
 

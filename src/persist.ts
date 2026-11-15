@@ -4,6 +4,7 @@ import {
   type BuyerRow,
   type DbRows,
   type GiftRow,
+  type GalleryRow,
   type LineRow,
   type MovementRow,
   type OfferRow,
@@ -84,8 +85,12 @@ export async function readShop(db: Sql): Promise<{ revision: number; state: Stat
             facebook, instagram, youtube, whatsapp
      FROM seller WHERE id = 1`,
   )
+  const gallery = await db.all<GalleryRow>(
+    `SELECT id, product_id AS productId, variant_id AS variantId, url, created_at AS createdAt, position
+     FROM gallery_images`,
+  )
 
-  const tables: DbRows = { products, variants, purchases, movements, buyers, orders, lines, gifts, offers, offerGifts, seller }
+  const tables: DbRows = { products, variants, purchases, movements, buyers, orders, lines, gifts, offers, offerGifts, seller, gallery }
   return { revision: shop.revision, state: fromRows(tables) }
 }
 
@@ -103,6 +108,7 @@ export async function writeShop(db: Sql, state: State, revision: number) {
     statement('DELETE FROM offers'),
     statement('DELETE FROM buyers'),
     statement('DELETE FROM seller'),
+    statement('DELETE FROM gallery_images'),
   ]
 
   for (const product of tables.products) {
@@ -142,6 +148,12 @@ export async function writeShop(db: Sql, state: State, revision: number) {
         ],
       ),
     )
+  }
+  for (const image of tables.gallery) {
+    statements.push(statement(
+      'INSERT INTO gallery_images (id, product_id, variant_id, url, created_at, position) VALUES (?, ?, ?, ?, ?, ?)',
+      [image.id, image.productId, image.variantId, image.url, image.createdAt, image.position],
+    ))
   }
   for (const purchase of tables.purchases) {
     statements.push(

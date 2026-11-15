@@ -172,6 +172,14 @@ export type OfferGift = {
   quantityUnit?: 'box' | 'item'
 }
 
+export type GalleryImage = {
+  id: string
+  productId: string
+  variantId: string
+  url: string
+  createdAt: string
+}
+
 export type Offer = {
   id: string
   name: string
@@ -208,5 +216,6 @@ export type State = {
   buyers: Buyer[]
   orders: CustomerOrder[]
   offers: Offer[]
+  gallery?: GalleryImage[]
   seller?: SellerProfile
 }
