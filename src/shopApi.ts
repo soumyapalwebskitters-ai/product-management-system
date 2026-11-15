@@ -13,7 +13,9 @@ export async function handleState(method: string, body: unknown, db: Sql) {
     console.error('Shop state request failed', error)
     const errorText = message.includes('no such table')
       ? 'D1 tables are missing. Apply the database migrations and reload.'
-      : 'Could not use the shop database.'
+      : message
+        ? `Could not use the shop database: ${message}`
+        : 'Could not use the shop database.'
     return { status: 500, body: { error: errorText } }
   }
 }
