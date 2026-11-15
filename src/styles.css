@@ -1201,15 +1201,35 @@ button .ui-icon, h2 .ui-icon, h3 .ui-icon, .search-input .ui-icon { margin-right
 @keyframes spin { to { transform: rotate(360deg); } }
 .glance-actions { justify-content: flex-end; margin: 12px 0; }
 .gallery-page { display: grid; gap: 18px; }
+.gallery-groups { display: grid; gap: 22px; }
+.gallery-group { display: grid; gap: 10px; }
+.gallery-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.gallery-group-head h3 { margin: 0; font-family: var(--serif); font-size: 22px; }
+.gallery-group-head span { color: var(--muted); font-size: 13px; }
 .gallery-add { display: grid; gap: 10px; max-width: 680px; }
 .gallery-add h3 { margin: 0; font-family: var(--serif); font-size: 22px; }
 .gallery-preview { display: none; width: min(100%, 280px); max-height: 220px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: var(--highlight); }
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
 .gallery-card { display: grid; gap: 9px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.gallery-image-button { display: block; width: 100%; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: zoom-in; }
 .gallery-card img { width: 100%; height: 170px; object-fit: cover; border-radius: 6px; background: var(--highlight); }
 .gallery-card div { display: grid; gap: 2px; min-width: 0; }
 .gallery-card strong, .gallery-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-card span { color: var(--muted); font-size: 12px; }
+.gallery-lightbox { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .78); }
+.gallery-lightbox-panel { position: relative; display: grid; place-items: center; width: min(920px, 100%); max-height: 92vh; padding: 42px 58px 18px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface); box-shadow: 0 24px 80px rgba(0, 0, 0, .42); }
+.gallery-lightbox-panel img { display: block; width: min(760px, 100%); max-height: 72vh; object-fit: contain; border-radius: 8px; background: var(--highlight); }
+.gallery-lightbox-panel p { margin: 12px 0 0; color: var(--muted); text-align: center; }
+.gallery-lightbox-close, .gallery-lightbox-nav { position: absolute; display: grid; place-items: center; border: 1px solid var(--line-strong); color: var(--ink); background: var(--paper); cursor: pointer; }
+.gallery-lightbox-close { top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; font-size: 24px; line-height: 1; }
+.gallery-lightbox-nav { top: 50%; width: 40px; height: 52px; transform: translateY(-50%); border-radius: 8px; font-size: 34px; line-height: 1; }
+.gallery-lightbox-nav.prev { left: 12px; }
+.gallery-lightbox-nav.next { right: 12px; }
+@media (max-width: 560px) {
+  .gallery-lightbox { padding: 8px; }
+  .gallery-lightbox-panel { padding: 52px 42px 16px; }
+  .gallery-lightbox-panel img { max-height: 68vh; }
+}
 .glance-table { min-width: 0; }
 .glance-table tr.product-group-start td { border-top: 2px solid var(--line-strong); }
 .glance-variant { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }

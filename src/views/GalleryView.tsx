@@ -1,9 +1,11 @@
-﻿import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/Icon'
 import { ProductSelect, type SelectOption } from '../components/ProductSelect'
 import { useMarket } from '../store'
 import type { SearchMode } from '../search'
 import { galleryImageSrc, normalizeDriveImageUrl } from '../gallery'
+
+type GalleryEntry = { id: string; url: string; label: string }
 
 export function GalleryView() {
   const { state, addGalleryImage, removeGalleryImage } = useMarket()
@@ -12,8 +14,31 @@ export function GalleryView() {
   const [mode, setMode] = useState<SearchMode>('smart')
   const [url, setUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ items: GalleryEntry[]; index: number } | null>(null)
   const options = useMemo<SelectOption[]>(() => state.products.flatMap((product) => product.variants.map((variant) => ({ id: variant.id, title: `${product.name} - ${variant.name || 'Standard'}`, meta: variant.sku, searchText: `${product.name} ${variant.name} ${variant.sku}` }))), [state.products])
   const linked = state.gallery ?? []
+  const groups = useMemo(() => {
+    const result = new Map<string, { productName: string; items: Array<{ item: (typeof linked)[number]; variantName: string }> }>()
+    for (const item of linked) {
+      const product = state.products.find((entry) => entry.id === item.productId)
+      const variant = product?.variants.find((entry) => entry.id === item.variantId)
+      const group = result.get(item.productId) ?? { productName: product?.name ?? 'Product removed', items: [] }
+      group.items.push({ item, variantName: variant?.name || 'Standard' })
+      result.set(item.productId, group)
+    }
+    return [...result.values()]
+  }, [linked, state.products])
+
+  useEffect(() => {
+    if (!lightbox) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLightbox(null)
+      if (event.key === 'ArrowLeft') setLightbox((current) => current ? { ...current, index: (current.index - 1 + current.items.length) % current.items.length } : current)
+      if (event.key === 'ArrowRight') setLightbox((current) => current ? { ...current, index: (current.index + 1) % current.items.length } : current)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [lightbox])
 
   function save() {
     if (!selectedId) { setError('Choose a product variant.'); return }
@@ -22,10 +47,7 @@ export function GalleryView() {
     try {
       const parsed = new URL(cleanUrl)
       if (!/^https?:$/.test(parsed.protocol)) throw new Error('invalid protocol')
-    } catch {
-      setError('Enter a valid image URL.')
-      return
-    }
+    } catch { setError('Enter a valid image URL.'); return }
     const product = state.products.find((item) => item.variants.some((variant) => variant.id === selectedId))
     if (!product) { setError('Choose a valid product variant.'); return }
     const result = addGalleryImage({ productId: product.id, variantId: selectedId, url: normalizeDriveImageUrl(cleanUrl) })
@@ -43,13 +65,27 @@ export function GalleryView() {
       {error && <p className="error" role="alert">{error}</p>}
       <div className="dialog-actions"><button type="button" className="btn" onClick={save}>Add to gallery</button></div>
     </section>
-    <section className="gallery-grid" aria-label="Product gallery">
-      {linked.length === 0 ? <div className="empty"><Icon name="eye" /><h3>No gallery images yet</h3><p>Add a Drive image and assign it to a variant.</p></div> : linked.map((item) => {
-        const product = state.products.find((entry) => entry.id === item.productId)
-        const variant = product?.variants.find((entry) => entry.id === item.variantId)
-        return <article className="gallery-card" key={item.id}><img src={galleryImageSrc(item.url)} alt={`${product?.name ?? 'Product'} ${variant?.name ?? 'Variant'}`} /><div><strong>{product?.name ?? 'Product removed'}</strong><span>{variant?.name || 'Standard'}</span></div><button type="button" className="btn danger-text small" onClick={() => removeGalleryImage(item.id)}>Remove</button></article>
+    <section className="gallery-groups" aria-label="Product gallery">
+      {linked.length === 0 ? <div className="empty"><Icon name="eye" /><h3>No gallery images yet</h3><p>Add a Drive image and assign it to a variant.</p></div> : groups.map((group) => {
+        const items = group.items.map(({ item, variantName }) => ({ id: item.id, url: item.url, label: `${group.productName} · ${variantName}` }))
+        return <section className="gallery-group" key={group.productName}>
+          <div className="gallery-group-head"><h3>{group.productName}</h3><span>{items.length} image{items.length === 1 ? '' : 's'}</span></div>
+          <div className="gallery-grid">{group.items.map(({ item, variantName }, index) => <article className="gallery-card" key={item.id}>
+            <button type="button" className="gallery-image-button" aria-label={`Open ${group.productName} ${variantName} images`} onClick={() => setLightbox({ items, index })}><img src={galleryImageSrc(item.url)} alt={`${group.productName} ${variantName}`} /></button>
+            <div><strong>{variantName}</strong><span>Click image to view gallery</span></div>
+            <button type="button" className="btn danger-text small" onClick={() => removeGalleryImage(item.id)}>Remove</button>
+          </article>)}</div>
+        </section>
       })}
     </section>
+    {lightbox && <div className="gallery-lightbox" role="dialog" aria-modal="true" aria-label="Image gallery" onClick={() => setLightbox(null)}>
+      <div className="gallery-lightbox-panel" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="gallery-lightbox-close" aria-label="Close image gallery" onClick={() => setLightbox(null)}>×</button>
+        <button type="button" className="gallery-lightbox-nav prev" aria-label="Previous image" onClick={() => setLightbox((current) => current ? { ...current, index: (current.index - 1 + current.items.length) % current.items.length } : current)}>‹</button>
+        <img src={galleryImageSrc(lightbox.items[lightbox.index].url)} alt={lightbox.items[lightbox.index].label} />
+        <button type="button" className="gallery-lightbox-nav next" aria-label="Next image" onClick={() => setLightbox((current) => current ? { ...current, index: (current.index + 1) % current.items.length } : current)}>›</button>
+        <p>{lightbox.items[lightbox.index].label} · {lightbox.index + 1} / {lightbox.items.length}</p>
+      </div>
+    </div>}
   </section>
 }
-
