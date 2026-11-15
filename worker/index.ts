@@ -61,7 +61,7 @@ export default {
     if (url.pathname === '/api/gallery-image' && request.method === 'GET') {
       try { return await galleryImage(request) } catch { return new Response('Image could not be loaded.', { status: 502 }) }
     }
-    if (url.pathname === '/api/gallery' && request.method === 'POST') {
+    if (url.pathname === '/api/gallery' && (request.method === 'POST' || request.method === 'DELETE')) {
       const parsed = await requestBody(request)
       if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
       const result = await handleGallery(request.method, parsed.body, db)

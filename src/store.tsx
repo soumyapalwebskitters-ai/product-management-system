@@ -63,7 +63,7 @@ type MarketApi = {
   saveSeller: (input: SellerProfile) => ActionResult
   importBuyer: (input: BuyerInput) => ActionResult
   addGalleryImage: (input: Omit<GalleryImage, 'id' | 'createdAt'>) => Promise<ActionResult>
-  removeGalleryImage: (id: string) => ActionResult
+  removeGalleryImage: (id: string) => Promise<ActionResult>
 }
 
 type ShopPayload = { revision: number; state: State; fresh: boolean }
@@ -394,7 +394,25 @@ export function MarketProvider({ children }: { children: ReactNode }) {
           if (pendingSavesRef.current === 0) setSaving(false)
         }
       },
-      removeGalleryImage: (id) => commit(removeGalleryImage(stateRef.current ?? state, id), 'Gallery image removed.'),
+      removeGalleryImage: async (id) => {
+        const result = removeGalleryImage(stateRef.current ?? state, id)
+        if (!result.ok) return result
+        pendingSavesRef.current += 1
+        setSaving(true)
+        try {
+          const response = await fetch('/api/gallery', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ revision: revisionRef.current, id }) })
+          const body = await response.json().catch(() => null)
+          if (!response.ok) return { ok: false, error: await errorMessage(body, 'Could not remove gallery image.') }
+          if (isRecord(body) && typeof body.revision === 'number') revisionRef.current = body.revision
+          stateRef.current = result.state
+          setState(result.state)
+          setNotice('Gallery image removed.')
+          return { ok: true }
+        } finally {
+          pendingSavesRef.current = Math.max(0, pendingSavesRef.current - 1)
+          if (pendingSavesRef.current === 0) setSaving(false)
+        }
+      },
     }
   }, [dismissNotice, notice, persist, state])
 

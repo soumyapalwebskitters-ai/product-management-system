@@ -55,6 +55,11 @@ export function GalleryView() {
     setUrl(''); setQuery(''); setSelectedId(null); setError(null)
   }
 
+  async function remove(id: string) {
+    const result = await removeGalleryImage(id)
+    if (!result.ok) setError(result.error)
+  }
+
   return <section className="gallery-page">
     <div className="page-head"><div><h2><Icon name="eye" /> Gallery</h2><p className="lede">Add Google Drive image links and assign them to a product variant.</p></div></div>
     <section className="gallery-add settings-card">
@@ -73,7 +78,7 @@ export function GalleryView() {
           <div className="gallery-grid">{group.items.map(({ item, variantName }, index) => <article className="gallery-card" key={item.id}>
             <button type="button" className="gallery-image-button" aria-label={`Open ${group.productName} ${variantName} images`} onClick={() => setLightbox({ items, index })}><img src={galleryImageSrc(item.url)} alt={`${group.productName} ${variantName}`} /></button>
             <div><strong>{variantName}</strong><span>Click image to view gallery</span></div>
-            <button type="button" className="btn danger-text small" onClick={() => removeGalleryImage(item.id)}>Remove</button>
+            <button type="button" className="btn danger-text small" onClick={() => void remove(item.id)}>Remove</button>
           </article>)}</div>
         </section>
       })}
