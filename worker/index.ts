@@ -1,5 +1,5 @@
 import { handleState } from '../src/shopApi'
-import { createBuyerAccount, currentAccount, expiredSessionCookie, login, logout, sellerExists, sessionCookie, setupSeller } from './auth'
+import { createBuyerAccount, currentAccount, expiredSessionCookie, login, loginSeller, logout, resetSellerPassword, sellerExists, sessionCookie, setupSeller } from './auth'
 import type { Sql, SqlStatement, SqlValue } from '../src/sql'
 
 type Env = {
@@ -60,6 +60,23 @@ export default {
       const result = await login(db, parsed.body)
       const headers: HeadersInit = 'token' in result && 'expiresAt' in result ? { 'set-cookie': sessionCookie(result.token, result.expiresAt) } : []
       return json(result.body, result.status, headers)
+    }
+    if (url.pathname === '/api/auth/seller/login' && request.method === 'POST') {
+      const parsed = await requestBody(request)
+      if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
+      try {
+        const result = await loginSeller(db, parsed.body)
+        const headers: HeadersInit = 'token' in result && 'expiresAt' in result ? { 'set-cookie': sessionCookie(result.token, result.expiresAt) } : []
+        return json(result.body, result.status, headers)
+      } catch (error) {
+        return json({ error: 'Could not start seller access.' }, 500)
+      }
+    }
+    if (url.pathname === '/api/auth/seller/password' && request.method === 'PUT') {
+      const parsed = await requestBody(request)
+      if (!parsed.ok) return json({ error: 'Expected JSON.' }, 400)
+      const result = await resetSellerPassword(db, await currentAccount(db, request), parsed.body)
+      return json(result.body, result.status)
     }
     if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
       const result = await logout(db, request)

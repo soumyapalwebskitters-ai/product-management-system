@@ -51,6 +51,13 @@ function wholeNumber(value: number, label: string, min: number) {
   return null
 }
 
+function money(value: number, label: string) {
+  if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.round(value * 100))) {
+    return `${label} must be a valid amount.`
+  }
+  return null
+}
+
 function locate(state: State, productId: string, variantId: string) {
   const productIndex = state.products.findIndex((product) => product.id === productId)
   if (productIndex < 0) return null
@@ -133,10 +140,10 @@ function parseProduct(
     seenSkus.add(key)
 
     const price = source.price ?? 0
-    const priceError = wholeNumber(price, `Selling price for ${variantName}`, 0)
+    const priceError = money(price, `Selling price for ${variantName}`)
     if (priceError) return fail(priceError)
     const buyingPrice = source.buyingPrice ?? 0
-    const buyingError = wholeNumber(buyingPrice, `Buying price for ${variantName}`, 0)
+    const buyingError = money(buyingPrice, `Buying price for ${variantName}`)
     if (buyingError) return fail(buyingError)
 
     variants.push({
@@ -146,9 +153,12 @@ function parseProduct(
       itemsPerBox: source.itemsPerBox,
       price,
       buyingPrice,
+      purchaseUnit: source.purchaseUnit === 'item' ? 'item' : 'box',
+      sellingUnit: source.sellingUnit === 'box' ? 'box' : 'item',
       currentStock: source.currentStock,
       minimumStock: source.minimumStock,
       desiredStock: source.desiredStock,
+      note: source.note?.trim() ?? '',
     })
   }
 
@@ -176,9 +186,12 @@ function toVariant(input: VariantInput): Variant {
     itemsPerBox: input.itemsPerBox,
     price: input.price ?? 0,
     buyingPrice: input.buyingPrice ?? 0,
+    purchaseUnit: input.purchaseUnit ?? 'box',
+    sellingUnit: input.sellingUnit ?? 'item',
     currentStock: input.currentStock,
     minimumStock: input.minimumStock,
     desiredStock: input.desiredStock,
+    note: input.note ?? '',
   }
 }
 
@@ -271,6 +284,9 @@ export function catalogStats(state: State) {
 export function createProduct(state: State, input: ProductInput, now: string): Outcome {
   const parsed = parseProduct(input, null)
   if (!parsed.ok) return parsed
+  if (state.products.some((product) => product.name.trim().toLocaleLowerCase() === parsed.name.toLocaleLowerCase())) {
+    return fail('Duplicate data found.')
+  }
   const clash = skuClash(state, parsed.variants, new Set())
   if (clash) return fail(clash)
 

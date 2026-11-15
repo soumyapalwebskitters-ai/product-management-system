@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ConfirmDialog, Dialog } from '../components/Dialog'
 import { matchesQuery } from '../search'
-import { useMarket } from '../store'
+import { DUPLICATE_DATA_ERROR, useMarket } from '../store'
 import type { Buyer } from '../types'
 
 type Draft = { name: string; phone: string; address: string; note: string }
@@ -28,5 +28,5 @@ function BuyerForm({ initial, submitLabel, onCancel, onSubmit }: { initial: Draf
   const [draft, setDraft] = useState<Draft>({ name: initial.name, phone: initial.phone, address: initial.address, note: initial.note })
   const [error, setError] = useState('')
   function submit(event: FormEvent) { event.preventDefault(); const result = onSubmit(draft); if (!result.ok) setError(result.error ?? 'Could not save buyer.') }
-  return <form onSubmit={submit}>{error && <p className="error" role="alert">{error}</p>}<label className="field"><span>Buyer name</span><input autoFocus value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label><label className="field"><span>Phone</span><input inputMode="tel" value={draft.phone} onChange={event => setDraft({ ...draft, phone: event.target.value })} /></label><label className="field"><span>Address</span><textarea value={draft.address} onChange={event => setDraft({ ...draft, address: event.target.value })} /></label><label className="field"><span>Note</span><textarea value={draft.note} onChange={event => setDraft({ ...draft, note: event.target.value })} /></label><div className="dialog-actions"><button className="btn secondary" type="button" onClick={onCancel}>Cancel</button><button className="btn" type="submit">{submitLabel}</button></div></form>
+  return <form onSubmit={submit}>{error && error !== DUPLICATE_DATA_ERROR && <p className="error" role="alert">{error}</p>}<label className="field"><span>Buyer name</span><input autoFocus value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label><label className="field"><span>Phone</span><input inputMode="tel" value={draft.phone} onChange={event => setDraft({ ...draft, phone: event.target.value })} /></label><label className="field"><span>Address</span><textarea value={draft.address} onChange={event => setDraft({ ...draft, address: event.target.value })} /></label><label className="field"><span>Note</span><textarea value={draft.note} onChange={event => setDraft({ ...draft, note: event.target.value })} /></label><div className="dialog-actions"><button className="btn secondary" type="button" onClick={onCancel}>Cancel</button><button className="btn" type="submit">{submitLabel}</button></div></form>
 }

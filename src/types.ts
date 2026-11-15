@@ -7,6 +7,9 @@ export type Variant = {
   /** What the shop pays for one item. */
   buyingPrice?: number
   purchaseUnit?: 'box' | 'item'
+  /** The unit buyers use when ordering this product. */
+  sellingUnit?: 'box' | 'item'
+  note?: string
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -31,6 +34,8 @@ export type VariantInput = {
   price?: number
   buyingPrice?: number
   purchaseUnit?: 'box' | 'item'
+  sellingUnit?: 'box' | 'item'
+  note?: string
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -120,6 +125,7 @@ export type GiftLine = {
   variantName: string
   sku: string
   quantity: number
+  unitPrice?: number
 }
 
 export type RecordedOffer =
@@ -156,6 +162,13 @@ export type CustomerOrder = {
   updatedAt: string
 }
 
+export type OfferGift = {
+  productId: string
+  variantId: string
+  quantity: number
+  quantityUnit?: 'box' | 'item'
+}
+
 export type Offer = {
   id: string
   name: string
@@ -165,10 +178,15 @@ export type Offer = {
   productId: string
   variantId: string
   quantity: number
+  quantityUnit?: 'box' | 'item'
+  /** All gifts for this offer. The scalar fields above keep existing offers compatible. */
+  giftItems?: OfferGift[]
 }
 
 export type SellerProfile = {
   name: string
+  email: string
+  phone: string
   address: string
   gst: string
   businessName: string

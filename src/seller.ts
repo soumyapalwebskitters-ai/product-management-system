@@ -18,8 +18,16 @@ function image(value: string | undefined, label: string) {
   return { ok: true as const, value: next }
 }
 
+function email(value: string) {
+  const next = value.trim().toLowerCase()
+  if (next && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) return { ok: false as const, error: 'Enter a valid email address.' }
+  return { ok: true as const, value: next }
+}
+
 export function updateSeller(state: State, input: SellerProfile): Outcome {
   const name = trimmed(input.name, 'Seller name', 80)
+  const sellerEmail = email(input.email)
+  const phone = trimmed(input.phone, 'Phone number', 30)
   const address = trimmed(input.address, 'Address', 200)
   const gst = trimmed(input.gst, 'GST number', 20)
   const businessName = trimmed(input.businessName, 'Business name', 80)
@@ -29,13 +37,15 @@ export function updateSeller(state: State, input: SellerProfile): Outcome {
   const instagram = trimmed(input.instagram, 'Instagram', 120)
   const youtube = trimmed(input.youtube, 'YouTube', 120)
   const whatsapp = trimmed(input.whatsapp, 'WhatsApp ID', 40)
-  const checked = [name, address, gst, businessName, profileImage, logo, facebook, instagram, youtube, whatsapp]
+  const checked = [name, sellerEmail, phone, address, gst, businessName, profileImage, logo, facebook, instagram, youtube, whatsapp]
   const invalid = checked.find((field) => !field.ok)
   if (invalid && !invalid.ok) return invalid
 
   const next = structuredClone(state)
   next.seller = {
     name: name.ok ? name.value : '',
+    email: sellerEmail.ok ? sellerEmail.value : '',
+    phone: phone.ok ? phone.value : '',
     address: address.ok ? address.value : '',
     gst: gst.ok ? gst.value : '',
     businessName: businessName.ok ? businessName.value : '',

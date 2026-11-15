@@ -15,9 +15,12 @@ type ProductSelectProps = {
   query: string
   mode: SearchMode
   selectedId: string | null
+  selectedIds?: string[]
+  multiple?: boolean
   onQueryChange: (query: string) => void
   onModeChange: (mode: SearchMode) => void
   onSelect: (id: string | null) => void
+  onMultiSelect?: (ids: string[]) => void
   inline?: boolean
 }
 
@@ -28,9 +31,12 @@ export function ProductSelect({
   query,
   mode,
   selectedId,
+  selectedIds = [],
+  multiple = false,
   onQueryChange,
   onModeChange,
   onSelect,
+  onMultiSelect,
   inline = false,
 }: ProductSelectProps) {
   const [open, setOpen] = useState(false)
@@ -39,6 +45,7 @@ export function ProductSelect({
   const searchRef = useRef<HTMLInputElement>(null)
   const listId = useId()
   const selected = options.find((option) => option.id === selectedId) ?? null
+  const selectedOptions = options.filter((option) => selectedIds.includes(option.id))
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -72,12 +79,22 @@ export function ProductSelect({
   }, [open])
 
   function choose(id: string) {
+    if (multiple) {
+      onMultiSelect?.(selectedIds.includes(id) ? selectedIds.filter((selected) => selected !== id) : [...selectedIds, id])
+      return
+    }
     onSelect(id)
     onQueryChange('')
     setOpen(false)
   }
 
   function clear() {
+    if (multiple) {
+      onMultiSelect?.([])
+      onQueryChange('')
+      setOpen(true)
+      return
+    }
     onSelect(null)
     onQueryChange('')
     setOpen(true)
@@ -96,7 +113,7 @@ export function ProductSelect({
     }
     if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault()
-      onSelect(null)
+      if (!multiple) onSelect(null)
       onQueryChange(event.key)
       setOpen(true)
     }
@@ -119,8 +136,10 @@ export function ProductSelect({
     }
   }
 
-  const triggerText = selected?.title || (query ? `“${query}”` : placeholder)
-  const hasValue = Boolean(selected || query)
+  const triggerText = multiple
+    ? selectedOptions.length ? `${selectedOptions.length} gifts selected` : placeholder
+    : selected?.title || (query ? `"${query}"` : placeholder)
+  const hasValue = multiple ? Boolean(selectedOptions.length || query) : Boolean(selected || query)
 
   return (
     <div className={inline ? 'picker inline' : 'picker'} ref={rootRef} data-testid="product-select">
@@ -158,7 +177,7 @@ export function ProductSelect({
               placeholder="Type to search"
               value={query}
               onChange={(event) => {
-                onSelect(null)
+                if (!multiple) onSelect(null)
                 onQueryChange(event.target.value)
               }}
               onKeyDown={onSearchKeyDown}
@@ -190,15 +209,15 @@ export function ProductSelect({
           <p className="picker-count">
             {matches.length} {matches.length === 1 ? 'match' : 'matches'}
           </p>
-          <ul className="picker-list" id={listId} role="listbox" aria-label={label}>
+          <ul className="picker-list" id={listId} role="listbox" aria-label={label} aria-multiselectable={multiple || undefined}>
             {matches.length === 0 && <li className="picker-empty">No names match.</li>}
             {matches.map((option, index) => (
               <li key={option.id} role="presentation">
                 <button
                   type="button"
                   role="option"
-                  aria-selected={option.id === selectedId || index === active}
-                  className={index === active ? 'picker-option active' : 'picker-option'}
+                  aria-selected={multiple ? selectedIds.includes(option.id) : option.id === selectedId || index === active}
+                  className={`${index === active ? 'picker-option active' : 'picker-option'}${multiple && selectedIds.includes(option.id) ? ' selected' : ''}`}
                   onMouseEnter={() => setActive(index)}
                   onClick={() => choose(option.id)}
                 >
@@ -209,6 +228,7 @@ export function ProductSelect({
                       <SmartText text={option.title} query={query} />
                     )}
                   </span>
+                  {multiple && selectedIds.includes(option.id) && <small>Selected</small>}
                   {option.meta && <small>{option.meta}</small>}
                 </button>
               </li>

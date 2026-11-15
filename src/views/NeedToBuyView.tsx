@@ -7,6 +7,8 @@ import { boxesLabel, itemsLabel } from '../format'
 import { buyRows, type BuyRow } from '../inventory'
 import { matchesQuery, type SearchMode } from '../search'
 import { useMarket } from '../store'
+import { Icon } from '../components/Icon'
+import { openMailto } from '../mailto'
 
 type Filter = 'all' | 'out' | 'low'
 
@@ -19,6 +21,18 @@ export function NeedToBuyView() {
   const [filter, setFilter] = useState<Filter>('all')
   const [buying, setBuying] = useState<BuyRow | null>(null)
   const [receiveId, setReceiveId] = useState<string | null>(null)
+  const [emailMessage, setEmailMessage] = useState<string | null>(null)
+  const [emailing, setEmailing] = useState(false)
+
+  async function emailReport() {
+    setEmailing(true)
+    const text = rows.length
+      ? rows.map((row) => `${row.productName} · ${row.variant.name || 'Standard'} — current: ${row.variant.currentStock}, minimum: ${row.variant.minimumStock}, buy: ${row.variant.purchaseUnit === 'item' ? `${row.calc.purchaseQty} items` : `${row.calc.boxes} boxes`}`).join('\n')
+      : 'No products need restocking.'
+    const opened = openMailto(market.state.seller?.email, `${market.state.seller?.businessName || 'Baji Market'}: Need to buy`, text)
+    setEmailMessage(opened ? 'Email draft opened.' : 'Save a valid seller email first.')
+    setEmailing(false)
+  }
 
   const options = useMemo<SelectOption[]>(
     () =>
@@ -62,7 +76,11 @@ export function NeedToBuyView() {
             orders, adjustments, and receipts update this list immediately.
           </p>
         </div>
+        <button type="button" className="btn secondary" onClick={emailReport} disabled={emailing}>
+          <Icon name="mail" /> {emailing ? 'Emailing…' : 'Email list'}
+        </button>
       </div>
+      {emailMessage && <p className="hint" role="status">{emailMessage}</p>}
 
       <div className="summary" aria-label="Purchase summary">
         <article>

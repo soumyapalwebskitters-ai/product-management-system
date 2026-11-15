@@ -1,5 +1,5 @@
 import type { Outcome } from './inventory'
-import type { GiftLine, Offer, RecordedOffer, State } from './types'
+import type { GiftLine, Offer, OfferGift, RecordedOffer, State } from './types'
 
 const MAX_AMOUNT = 1_000_000
 
@@ -11,6 +11,8 @@ export type OfferInput = {
   productId: string
   variantId: string
   quantity: number
+  quantityUnit?: 'box' | 'item'
+  giftItems?: OfferGift[]
 }
 
 export type PricedLine = {
@@ -26,6 +28,8 @@ type CatalogItem = {
   variantId: string
   variantName: string
   sku: string
+  itemsPerBox: number
+  price: number
 }
 
 function fail(error: string): { ok: false; error: string } {
@@ -63,21 +67,37 @@ export function chooseOffer(
         amount: discountAmount(subtotal, offer.percent),
       }
     }
-    const item = findItem(offer.productId, offer.variantId)
-    if (!item || offer.quantity <= 0) continue
-    const gift: GiftLine = {
-      productId: item.productId,
-      variantId: item.variantId,
-      productName: item.productName,
-      variantName: item.variantName,
-      sku: item.sku,
-      quantity: offer.quantity,
+    const configuredGifts = offer.giftItems?.length
+      ? offer.giftItems
+      : [{ productId: offer.productId, variantId: offer.variantId, quantity: offer.quantity, quantityUnit: offer.quantityUnit }]
+    const gifts: GiftLine[] = []
+    for (const configured of configuredGifts) {
+      const item = findItem(configured.productId, configured.variantId)
+      if (!item || configured.quantity <= 0) {
+        gifts.length = 0
+        break
+      }
+      const quantity = configured.quantity * ((configured.quantityUnit ?? 'item') === 'box' ? item.itemsPerBox : 1)
+      if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+        gifts.length = 0
+        break
+      }
+      gifts.push({
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName,
+        variantName: item.variantName,
+        sku: item.sku,
+        quantity,
+        unitPrice: item.price,
+      })
     }
+    if (gifts.length === 0) continue
     return {
       kind: 'gift',
       offerId: offer.id,
       offerName: offer.name,
-      items: [gift],
+      items: gifts,
     }
   }
   return null
@@ -98,10 +118,10 @@ export function upsertOffer(state: State, input: OfferInput, offerId: string | n
   if (input.minimumAmount > MAX_AMOUNT) return fail('That purchase amount is too large.')
 
   const duplicate = state.offers.some(
-    (offer) => offer.minimumAmount === input.minimumAmount && offer.id !== offerId,
+    (offer) => (offer.minimumAmount === input.minimumAmount || offer.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase()) && offer.id !== offerId,
   )
   if (duplicate) {
-    return fail('An offer already starts at that amount. Edit it, or choose a different amount.')
+    return fail('Duplicate data found.')
   }
 
   const nextOffer: Offer = {
@@ -113,6 +133,7 @@ export function upsertOffer(state: State, input: OfferInput, offerId: string | n
     productId: '',
     variantId: '',
     quantity: 0,
+    quantityUnit: 'item',
   }
 
   if (nextOffer.reward === 'discount') {
@@ -121,15 +142,33 @@ export function upsertOffer(state: State, input: OfferInput, offerId: string | n
     }
     nextOffer.percent = input.percent
   } else {
-    const item = findCatalogItem(state, input.productId, input.variantId)
-    if (!item) return fail('Choose the gift from the catalog.')
-    if (!Number.isInteger(input.quantity) || input.quantity < 1) {
-      return fail('Enter how many gift items to give.')
+    const configuredGifts = input.giftItems?.length
+      ? input.giftItems
+      : [{ productId: input.productId, variantId: input.variantId, quantity: input.quantity, quantityUnit: input.quantityUnit }]
+    const seen = new Set<string>()
+    const gifts: OfferGift[] = []
+    for (const configured of configuredGifts) {
+      const item = findCatalogItem(state, configured.productId, configured.variantId)
+      if (!item) return fail('Choose each gift from the catalog.')
+      const quantityUnit = configured.quantityUnit === 'box' ? 'box' : 'item'
+      if (!Number.isInteger(configured.quantity) || configured.quantity < 1) {
+        return fail('Enter how many gift pieces or boxes to give.')
+      }
+      const itemQuantity = configured.quantity * (quantityUnit === 'box' ? item.itemsPerBox : 1)
+      if (configured.quantity > MAX_AMOUNT || !Number.isSafeInteger(itemQuantity) || itemQuantity > MAX_AMOUNT) {
+        return fail('That gift quantity is too large.')
+      }
+      const key = `${item.productId}:${item.variantId}`
+      if (seen.has(key)) return fail('Duplicate data found.')
+      seen.add(key)
+      gifts.push({ productId: item.productId, variantId: item.variantId, quantity: configured.quantity, quantityUnit })
     }
-    if (input.quantity > MAX_AMOUNT) return fail('That gift quantity is too large.')
-    nextOffer.productId = item.productId
-    nextOffer.variantId = item.variantId
-    nextOffer.quantity = input.quantity
+    const first = gifts[0]
+    nextOffer.productId = first.productId
+    nextOffer.variantId = first.variantId
+    nextOffer.quantity = first.quantity
+    nextOffer.quantityUnit = first.quantityUnit
+    nextOffer.giftItems = gifts
   }
 
   const next = structuredClone(state)
@@ -158,6 +197,8 @@ export function findCatalogItem(state: State, productId: string, variantId: stri
     variantId: variant.id,
     variantName: variant.name,
     sku: variant.sku,
+    itemsPerBox: variant.itemsPerBox,
+    price: variant.price,
   }
 }
 
@@ -166,6 +207,10 @@ export function offerSummary(offer: Offer, giftLabel: string) {
   if (offer.reward === 'discount') {
     return `Spend ${amount} or more and the bill is ${offer.percent}% off.`
   }
-  const count = `${offer.quantity.toLocaleString()} ${offer.quantity === 1 ? 'item' : 'items'}`
+  if ((offer.giftItems?.length ?? 0) > 1) {
+    return `Spend ${amount} or more and get ${offer.giftItems!.length} free gift items.`
+  }
+  const unit = offer.quantityUnit ?? 'item'
+  const count = `${offer.quantity.toLocaleString()} ${unit === 'box' ? (offer.quantity === 1 ? 'box' : 'boxes') : (offer.quantity === 1 ? 'piece' : 'pieces')}`
   return `Spend ${amount} or more and get ${count} of ${giftLabel} free.`
 }

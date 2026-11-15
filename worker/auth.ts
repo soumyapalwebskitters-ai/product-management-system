@@ -7,6 +7,8 @@ type AccountRow = Account & { passwordHash: string; passwordSalt: string; active
 type SessionRow = Account & { expiresAt: string; active: number }
 
 const encoder = new TextEncoder()
+const DEFAULT_SELLER_PASSWORD = 'bajimarket'
+const DEFAULT_SELLER_EMAIL = 'seller@baji-market.ai'
 
 function hex(bytes: Uint8Array) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -25,7 +27,7 @@ async function digest(value: string) {
 async function passwordHash(password: string, salt: string) {
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits'])
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(salt), iterations: 210000 },
+    { name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(salt), iterations: 100000 },
     key,
     256,
   )
@@ -39,8 +41,55 @@ function validCredentials(email: unknown, password: unknown): { email: string; p
   return { email: normalizedEmail, password }
 }
 
+function validPassword(password: unknown): string | null {
+  if (typeof password !== 'string' || password.length < 8 || password.length > 200) return null
+  return password
+}
+
 export async function sellerExists(db: Sql) {
   return Boolean(await db.first<{ id: string }>("SELECT id FROM auth_accounts WHERE role = 'seller' LIMIT 1"))
+}
+
+async function ensureDefaultSeller(db: Sql) {
+  const existing = await db.first<AccountRow>(
+    `SELECT id, role, buyer_id AS buyerId, email, password_hash AS passwordHash, password_salt AS passwordSalt, active
+     FROM auth_accounts WHERE role = 'seller' LIMIT 1`,
+  )
+  if (existing) return existing
+
+  const now = new Date().toISOString()
+  const id = randomId()
+  const salt = randomId()
+  const hash = await passwordHash(DEFAULT_SELLER_PASSWORD, salt)
+  await db.batch([{
+    sql: `INSERT INTO auth_accounts (id, role, buyer_id, email, password_hash, password_salt, active, created_at, updated_at)
+          VALUES (?, 'seller', NULL, ?, ?, ?, 1, ?, ?)`,
+    params: [id, DEFAULT_SELLER_EMAIL, hash, salt, now, now],
+  }])
+  return { id, role: 'seller' as const, buyerId: null, email: DEFAULT_SELLER_EMAIL, passwordHash: hash, passwordSalt: salt, active: 1 }
+}
+
+export async function loginSeller(db: Sql, body: unknown) {
+  const password = validPassword((body as { password?: unknown })?.password)
+  if (!password) return { status: 400, body: { error: 'Enter a password with at least 8 characters.' } }
+  const account = await ensureDefaultSeller(db)
+  if (account.active !== 1 || (await passwordHash(password, account.passwordSalt)) !== account.passwordHash) {
+    return { status: 401, body: { error: 'Seller password is incorrect.' } }
+  }
+  return sessionFor(db, account, new Date().toISOString())
+}
+
+export async function resetSellerPassword(db: Sql, account: Account | null, body: unknown) {
+  if (!account || account.role !== 'seller') return { status: 403, body: { error: 'Seller access is required.' } }
+  const password = validPassword((body as { password?: unknown })?.password)
+  if (!password) return { status: 400, body: { error: 'Use a password with at least 8 characters.' } }
+  const salt = randomId()
+  const now = new Date().toISOString()
+  await db.batch([{
+    sql: 'UPDATE auth_accounts SET password_hash = ?, password_salt = ?, updated_at = ? WHERE id = ?',
+    params: [await passwordHash(password, salt), salt, now, account.id],
+  }])
+  return { status: 200, body: { ok: true } }
 }
 
 export async function setupSeller(db: Sql, body: unknown) {
@@ -113,9 +162,10 @@ async function sessionFor(db: Sql, account: Account, now: string) {
       params: [id, account.id, await digest(token), expiresAt, now],
     },
   ])
+  const publicAccount: Account = { id: account.id, role: account.role, buyerId: account.buyerId, email: account.email }
   return {
     status: 200,
-    body: { account },
+    body: { account: publicAccount },
     token,
     expiresAt,
   }

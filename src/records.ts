@@ -29,6 +29,7 @@ export type VariantRow = {
   price: number
   buyingPrice: number
   purchaseUnit: 'box' | 'item'
+  sellingUnit: 'box' | 'item'
   currentStock: number
   minimumStock: number
   desiredStock: number
@@ -123,6 +124,7 @@ export type GiftRow = {
   variantName: string
   sku: string
   quantity: number
+  unitPrice: number | null
 }
 
 export type OfferRow = {
@@ -134,11 +136,23 @@ export type OfferRow = {
   productId: string
   variantId: string
   quantity: number
+  quantityUnit: 'box' | 'item'
   position: number
+}
+
+export type OfferGiftRow = {
+  offerId: string
+  position: number
+  productId: string
+  variantId: string
+  quantity: number
+  quantityUnit: 'box' | 'item'
 }
 
 export type SellerRow = {
   name: string
+  email: string
+  phone: string
   address: string
   gst: string
   businessName: string
@@ -160,6 +174,7 @@ export type DbRows = {
   lines: LineRow[]
   gifts: GiftRow[]
   offers: OfferRow[]
+  offerGifts: OfferGiftRow[]
   seller: SellerRow | null
 }
 
@@ -180,6 +195,8 @@ function grouped<T extends { orderId: string; position: number }>(rows: T[]) {
 function sellerRow(state: State): SellerRow {
   return {
     name: state.seller?.name ?? '',
+    email: state.seller?.email ?? '',
+    phone: state.seller?.phone ?? '',
     address: state.seller?.address ?? '',
     gst: state.seller?.gst ?? '',
     businessName: state.seller?.businessName ?? '',
@@ -196,6 +213,8 @@ function sellerFrom(row: SellerRow | null): SellerProfile | undefined {
   if (!row) return undefined
   const seller: SellerProfile = {
     name: row.name,
+    email: row.email,
+    phone: row.phone,
     address: row.address,
     gst: row.gst,
     businessName: row.businessName,
@@ -208,6 +227,8 @@ function sellerFrom(row: SellerRow | null): SellerProfile | undefined {
   }
   const filled = [
     seller.name,
+    seller.email,
+    seller.phone,
     seller.address,
     seller.gst,
     seller.businessName,
@@ -244,6 +265,7 @@ export function toRows(state: State): DbRows {
         price: variant.price,
         buyingPrice: variant.buyingPrice ?? 0,
         purchaseUnit: variant.purchaseUnit ?? 'box',
+        sellingUnit: variant.sellingUnit ?? 'item',
         currentStock: variant.currentStock,
         minimumStock: variant.minimumStock,
         desiredStock: variant.desiredStock,
@@ -279,6 +301,7 @@ export function toRows(state: State): DbRows {
           variantName: item.variantName,
           sku: item.sku,
           quantity: item.quantity,
+          unitPrice: item.unitPrice ?? null,
         })
       })
     }
@@ -302,6 +325,22 @@ export function toRows(state: State): DbRows {
       updatedAt: order.updatedAt,
       position,
     }
+  })
+
+  const offerGifts: OfferGiftRow[] = []
+  const offers = state.offers.map((offer, position) => {
+    const configured = offer.giftItems?.length
+      ? offer.giftItems
+      : offer.reward === 'gift' ? [{ productId: offer.productId, variantId: offer.variantId, quantity: offer.quantity, quantityUnit: offer.quantityUnit }] : []
+    configured.forEach((gift, giftPosition) => offerGifts.push({
+      offerId: offer.id,
+      position: giftPosition,
+      productId: gift.productId,
+      variantId: gift.variantId,
+      quantity: gift.quantity,
+      quantityUnit: gift.quantityUnit ?? 'item',
+    }))
+    return { ...offer, quantityUnit: offer.quantityUnit ?? 'item', position }
   })
 
   return {
@@ -328,7 +367,8 @@ export function toRows(state: State): DbRows {
     orders,
     lines,
     gifts,
-    offers: state.offers.map((offer, position) => ({ ...offer, position })),
+    offers,
+    offerGifts,
     seller: sellerRow(state),
   }
 }
@@ -355,6 +395,7 @@ function offerFrom(row: OrderRow, gifts: GiftRow[]): RecordedOffer | null {
         variantName: gift.variantName,
         sku: gift.sku,
         quantity: gift.quantity,
+        ...(gift.unitPrice !== null ? { unitPrice: gift.unitPrice } : {}),
       })),
     }
   }
@@ -414,6 +455,7 @@ export function fromRows(rows: DbRows): State {
         price: variant.price,
         ...(variant.buyingPrice ? { buyingPrice: variant.buyingPrice } : {}),
         purchaseUnit: variant.purchaseUnit,
+        sellingUnit: variant.sellingUnit,
         currentStock: variant.currentStock,
         minimumStock: variant.minimumStock,
         desiredStock: variant.desiredStock,
@@ -440,7 +482,13 @@ export function fromRows(rows: DbRows): State {
     }),
     buyers: ordered(rows.buyers).map(({ position: _position, ...buyer }) => buyer),
     orders,
-    offers: ordered(rows.offers).map(({ position: _position, ...offer }) => offer),
+    offers: ordered(rows.offers).map(({ position: _position, ...offer }) => {
+      const gifts = rows.offerGifts
+        .filter((gift) => gift.offerId === offer.id)
+        .sort((left, right) => left.position - right.position)
+        .map(({ offerId: _offerId, position: _giftPosition, ...gift }) => gift)
+      return { ...offer, ...(gifts.length ? { giftItems: gifts } : {}) }
+    }),
     ...(sellerProfile ? { seller: sellerProfile } : {}),
   }
 }

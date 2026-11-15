@@ -38,6 +38,7 @@ export function demoOffers(): Offer[] {
       productId: '',
       variantId: '',
       quantity: 0,
+      quantityUnit: 'item',
     },
     {
       id: ids.offerGift,
@@ -48,6 +49,7 @@ export function demoOffers(): Offer[] {
       productId: ids.sparklers,
       variantId: ids.sp10,
       quantity: 2,
+      quantityUnit: 'item',
     },
   ]
 }

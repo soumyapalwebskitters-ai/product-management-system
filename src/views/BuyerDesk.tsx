@@ -466,6 +466,12 @@ function PurchaseDetail({
   products: Product[]
 }) {
   const discount = order.offer?.kind === 'discount' ? order.offer.amount : 0
+  const giftWorth = order.offer?.kind === 'gift'
+    ? order.offer.items.reduce((sum, item) => {
+        const price = item.unitPrice ?? products.find((product) => product.id === item.productId)?.variants.find((variant) => variant.id === item.variantId)?.price ?? 0
+        return sum + price * item.quantity
+      }, 0)
+    : 0
   const due = orderDue(order)
   const settled = order.status !== 'cancelled' && due === 0
   return (
@@ -492,8 +498,8 @@ function PurchaseDetail({
                   <tr>
                     <th>Item</th>
                     <th className="num">Qty</th>
-                    <th className="num">Unit price</th>
-                    <th className="num">Amount</th>
+                    <th className="num">Selling price / piece</th>
+                    <th className="num">Amount / gift worth</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -508,26 +514,29 @@ function PurchaseDetail({
                         </span>
                       </td>
                       <td data-label="Quantity" className="num">{line.quantity}</td>
-                      <td data-label="Unit price" className="num">{rupees(line.unitPrice)}</td>
+                      <td data-label="Selling price / piece" className="num">{rupees(line.unitPrice)}</td>
                       <td data-label="Amount" className="num">{rupees(line.quantity * line.unitPrice)}</td>
                     </tr>
                   ))}
                   {order.offer?.kind === 'gift' &&
-                    order.offer.items.map((item) => (
-                      <tr key={`gift-${item.variantId}`}>
-                        <td data-label="Item">
-                          <span className="item-with-photo">
-                            <ProductPhoto src={productImage(products, item.productId)} name={item.productName} />
-                            <span>
-                              {item.productName} {item.variantName} · Gift
+                    order.offer.items.map((item) => {
+                      const unitPrice = item.unitPrice ?? products.find((product) => product.id === item.productId)?.variants.find((variant) => variant.id === item.variantId)?.price ?? 0
+                      return (
+                        <tr key={`gift-${item.variantId}`}>
+                          <td data-label="Item">
+                            <span className="item-with-photo">
+                              <ProductPhoto src={productImage(products, item.productId)} name={item.productName} />
+                              <span>
+                                {item.productName} {item.variantName} · Gift
+                              </span>
                             </span>
-                          </span>
-                        </td>
-                        <td data-label="Quantity" className="num">{item.quantity}</td>
-                        <td data-label="Unit price" className="num">Gift</td>
-                        <td data-label="Amount" className="num">{rupees(0)}</td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td data-label="Quantity" className="num">{item.quantity}</td>
+                          <td data-label="Selling price / piece" className="num">{rupees(unitPrice)}</td>
+                          <td data-label="Amount / gift worth" className="num">{rupees(unitPrice * item.quantity)} <small>gift worth</small></td>
+                        </tr>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>
@@ -537,13 +546,12 @@ function PurchaseDetail({
           <dt>Total amount:</dt>
           <dd>{rupees(order.subtotal)}</dd>
         </div>
-        <div>
-          <dt>Discount amount:</dt>
-          <dd>
-            {rupees(discount)}
-            {order.offer?.kind === 'discount' ? ` · ${order.offer.offerName}` : ''}
-          </dd>
-        </div>
+        {order.offer && (
+          <div>
+            <dt>Offer / gift worth:</dt>
+            <dd>{rupees(order.offer.kind === 'discount' ? discount : giftWorth)} · {order.offer.offerName}</dd>
+          </div>
+        )}
         <div>
           <dt>Total pay:</dt>
           <dd>{rupees(order.total)}</dd>

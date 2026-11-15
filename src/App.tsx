@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ConfirmDialog } from './components/Dialog'
 import { buyRows } from './inventory'
 import { useMarket } from './store'
 import { BuyerDesk } from './views/BuyerDesk'
@@ -71,12 +70,13 @@ function titleFor(route: Route) {
 }
 
 export function App() {
-  const { notice, dismissNotice, resetDemo, state } = useMarket()
+  const { notice, dismissNotice, state } = useMarket()
   const [route, setRoute] = useState<Route>(readRoute)
-  const [confirmReset, setConfirmReset] = useState(false)
-  const [sellerUnlocked, setSellerUnlocked] = useState(() => localStorage.getItem('market.seller.unlocked') === 'true')
+  const [sellerUnlocked, setSellerUnlocked] = useState(false)
+  const [sellerSessionChecked, setSellerSessionChecked] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [sellerLoginPending, setSellerLoginPending] = useState(false)
   const [openSellerMenu, setOpenSellerMenu] = useState<string | null>(null)
   const sellerMenuRef = useRef<HTMLDivElement>(null)
   const restockCount = buyRows(state).length
@@ -90,7 +90,7 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    document.title = `${titleFor(route)} · Market`
+    document.title = `${titleFor(route)} · Baji Market`
   }, [route])
 
   useEffect(() => {
@@ -107,6 +107,30 @@ export function App() {
     return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
   }, [])
 
+  useEffect(() => {
+    if (route.role !== 'seller') {
+      setSellerSessionChecked(false)
+      return
+    }
+    let cancelled = false
+    setSellerSessionChecked(false)
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then(async (response) => ({ response, body: await response.json().catch(() => null) }))
+      .then(({ response, body }) => {
+        if (cancelled) return
+        const seller = response.ok && typeof body === 'object' && body !== null && 'account' in body && typeof body.account === 'object' && body.account !== null && 'role' in body.account && body.account.role === 'seller'
+        setSellerUnlocked(seller)
+        setSellerSessionChecked(true)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSellerUnlocked(false)
+          setSellerSessionChecked(true)
+        }
+      })
+    return () => { cancelled = true }
+  }, [route.role])
+
   function go(next: Route) {
     if (next.role === 'seller') window.location.hash = `/seller/${next.view}`
     else if (next.view === 'offers') window.location.hash = '/buyer/offers'
@@ -116,7 +140,7 @@ export function App() {
   }
 
   const role: Role = route.role
-  const locked = role === 'seller' && !sellerUnlocked
+  const locked = role === 'seller' && (!sellerSessionChecked || !sellerUnlocked)
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = role === 'seller' ? 'dark' : 'light'
@@ -131,7 +155,7 @@ export function App() {
               M
             </div>
             <div>
-              <p className="wordmark">Market</p>
+              <p className="wordmark">Baji Market</p>
               <h1>{role === 'seller' ? 'Seller' : 'Buyer'}</h1>
             </div>
           </div>
@@ -152,7 +176,7 @@ export function App() {
           <nav className="subnav" aria-label={role === 'seller' ? 'Seller menu' : 'Buyer menu'}>
             {role === 'seller'
               ? <div className="seller-menu-groups" ref={sellerMenuRef}>
-                  {sellerGroups.map((group) => <details className="seller-menu-group" key={group.label} open={openSellerMenu === group.label} onMouseEnter={() => setOpenSellerMenu(group.label)} onMouseLeave={() => setOpenSellerMenu(null)}><summary onClick={(event) => { event.preventDefault(); setOpenSellerMenu((current) => current === group.label ? null : group.label) }}>{group.label}<Icon name="caret" /></summary><div>{group.links.map((id) => {
+                  {sellerGroups.map((group) => <details className="seller-menu-group" key={group.label} open={openSellerMenu === group.label}><summary onClick={(event) => { event.preventDefault(); setOpenSellerMenu((current) => current === group.label ? null : group.label) }}>{group.label}<Icon name="caret" /></summary><div>{group.links.map((id) => {
                     const link = sellerLinks.find((item) => item.id === id)!
                     return <button key={link.id} type="button" aria-current={route.role === 'seller' && route.view === link.id ? 'page' : undefined} onClick={() => { setOpenSellerMenu(null); go({ role: 'seller', view: link.id }) }}><Icon name={link.icon} /> {link.label}{link.id === 'buy' && <span className="count" data-testid="restock-count">{restockCount}</span>}</button>
                   })}</div></details>)}
@@ -189,7 +213,7 @@ export function App() {
             </button>
           </div>
         )}
-        {locked ? <section className="seller-lock"><h2><Icon name="lock" /> Seller access</h2><p>{localStorage.getItem('market.seller.password') ? 'Enter the seller password to continue.' : 'Create a seller password to protect this device.'}</p>{passwordError && <p className="error">{passwordError}</p>}<form onSubmit={(event) => { event.preventDefault(); const saved = localStorage.getItem('market.seller.password'); if (!password.trim()) { setPasswordError('Enter a password.'); return } if (saved && saved !== password) { setPasswordError('Incorrect password.'); return } if (!saved) localStorage.setItem('market.seller.password', password); localStorage.setItem('market.seller.unlocked', 'true'); setSellerUnlocked(true); setPasswordError('') }}><label className="field">Seller password<input type="password" autoFocus value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="btn" type="submit"><Icon name="unlock" /> {localStorage.getItem('market.seller.password') ? 'Unlock seller' : 'Set password & unlock'}</button></form></section> : null}
+        {locked ? <section className="seller-lock"><h2><Icon name="lock" /> Seller access</h2>{!sellerSessionChecked ? <p>Checking seller session…</p> : <><p>Enter the seller password to continue.</p>{passwordError && <p className="error">{passwordError}</p>}<form onSubmit={async (event) => { event.preventDefault(); if (!password || sellerLoginPending) { if (!password) setPasswordError('Enter the seller password.'); return } setSellerLoginPending(true); try { const response = await fetch('/api/auth/seller/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) }); const body = await response.json().catch(() => null); if (!response.ok) { setPasswordError(typeof body?.error === 'string' ? body.error : 'Could not unlock Seller.'); return } setPassword(''); setPasswordError(''); setSellerUnlocked(true); setSellerSessionChecked(true) } catch { setPasswordError('Could not reach Seller access.') } finally { setSellerLoginPending(false) } }}><label className="field">Seller password<input type="password" autoFocus autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="btn" type="submit" disabled={sellerLoginPending}>{sellerLoginPending ? <><span className="spinner" aria-hidden="true" /> Checking…</> : <><Icon name="unlock" /> Unlock seller</>}</button></form></>}</section> : null}
         {!locked && route.role === 'seller' && route.view === 'products' && <ProductsView />}
         {!locked && route.role === 'seller' && route.view === 'glance' && <GlanceView />}
         {!locked && route.role === 'seller' && route.view === 'stock' && <StockView />}
@@ -211,34 +235,13 @@ export function App() {
         {route.role === 'buyer' && route.view === 'offers' && <OffersView editable={false} />}
         <footer className="footer">
           <p>Saved in the shop database.</p>
-          <button type="button" className="btn secondary small" onClick={() => setConfirmReset(true)}>
-            Restore sample data
-          </button>
         </footer>
       </main>
       <footer className="site-footer">
-        {!locked && role === 'seller' && <button type="button" className="footer-settings" aria-current={route.role === 'seller' && route.view === 'settings' ? 'page' : undefined} onClick={() => go({ role: 'seller', view: 'settings' })}><Icon name="settings" /> Settings</button>}
+        {role === 'seller' && <button type="button" className="footer-settings" aria-current={route.role === 'seller' && route.view === 'settings' ? 'page' : undefined} onClick={() => go({ role: 'seller', view: 'settings' })}><Icon name="settings" /> Settings</button>}
         <p>Developer: Soumya Pal</p>
         <p>Business owner: Rupsa Datta</p>
       </footer>
-
-      {confirmReset && (
-        <ConfirmDialog
-          title="Restore the sample catalog?"
-          body={
-            role === 'seller'
-              ? 'This replaces products, stock, buyers, purchases, and offers with the sample data.'
-              : 'This replaces the catalog, buyers, purchases, and offers with the sample data.'
-          }
-          confirmLabel="Restore sample data"
-          danger
-          onClose={() => setConfirmReset(false)}
-          onConfirm={() => {
-            resetDemo()
-            setConfirmReset(false)
-          }}
-        />
-      )}
     </div>
   )
 }

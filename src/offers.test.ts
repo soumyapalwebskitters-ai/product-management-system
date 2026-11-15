@@ -64,3 +64,35 @@ test('an offer is either a discount or a gift', () => {
     assert.equal(saved?.variantId, ids.fpSmall)
   }
 })
+
+test('gift offers can be configured by box and award all pieces at the quality selling price', () => {
+  const saved = upsertOffer(
+    seedState(),
+    {
+      name: 'Two boxes free',
+      minimumAmount: 1_000,
+      reward: 'gift',
+      percent: 0,
+      productId: ids.flowerPots,
+      variantId: ids.fpSmall,
+      quantity: 2,
+      quantityUnit: 'box',
+    },
+    null,
+  )
+  assert.equal(saved.ok, true)
+  if (!saved.ok) return
+
+  const offer = saved.state.offers.find((item) => item.name === 'Two boxes free')
+  assert.equal(offer?.quantityUnit, 'box')
+  assert.equal(offer?.quantity, 2)
+
+  const gift = chooseOffer(saved.state.offers, 1_000, (productId, variantId) =>
+    findCatalogItem(saved.state, productId, variantId),
+  )
+  assert.equal(gift?.kind, 'gift')
+  if (gift?.kind === 'gift') {
+    assert.equal(gift.items[0]?.quantity, 6)
+    assert.equal(gift.items[0]?.unitPrice, 30)
+  }
+})
