@@ -5,7 +5,7 @@ import { handleDevRequest, type NodeRequest, type NodeResponse } from './server/
 
 function shopMiddleware(req: NodeRequest & { url?: string }, res: NodeResponse, next: () => void) {
   const path = req.url?.split('?')[0]
-  if (path !== '/api/state') {
+  if (path !== '/api/state' && path !== '/api/gallery-image' && !path?.startsWith('/api/auth/')) {
     next()
     return
   }

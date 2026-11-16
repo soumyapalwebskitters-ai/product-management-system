@@ -122,8 +122,30 @@ export function App() {
       .then(({ response, body }) => {
         if (cancelled) return
         const seller = response.ok && typeof body === 'object' && body !== null && 'account' in body && typeof body.account === 'object' && body.account !== null && 'role' in body.account && body.account.role === 'seller'
-        setSellerUnlocked(seller)
-        setSellerSessionChecked(true)
+        if (seller) {
+          setSellerUnlocked(true)
+          setSellerSessionChecked(true)
+          return
+        }
+        if (!import.meta.env.DEV) {
+          setSellerUnlocked(false)
+          setSellerSessionChecked(true)
+          return
+        }
+        fetch('/api/auth/seller/auto-login', { method: 'POST' })
+          .then(async (autoResponse) => ({ autoResponse, autoBody: await autoResponse.json().catch(() => null) }))
+          .then(({ autoResponse, autoBody }) => {
+            if (cancelled) return
+            const autoSeller = autoResponse.ok && typeof autoBody === 'object' && autoBody !== null && 'account' in autoBody && typeof autoBody.account === 'object' && autoBody.account !== null && 'role' in autoBody.account && autoBody.account.role === 'seller'
+            setSellerUnlocked(autoSeller)
+            setSellerSessionChecked(true)
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setSellerUnlocked(false)
+              setSellerSessionChecked(true)
+            }
+          })
       })
       .catch(() => {
         if (!cancelled) {

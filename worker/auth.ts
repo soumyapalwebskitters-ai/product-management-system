@@ -79,6 +79,11 @@ export async function loginSeller(db: Sql, body: unknown) {
   return sessionFor(db, account, new Date().toISOString())
 }
 
+export async function autoLoginSeller(db: Sql) {
+  const account = await ensureDefaultSeller(db)
+  return sessionFor(db, account, new Date().toISOString())
+}
+
 export async function resetSellerPassword(db: Sql, account: Account | null, body: unknown) {
   if (!account || account.role !== 'seller') return { status: 403, body: { error: 'Seller access is required.' } }
   const password = validPassword((body as { password?: unknown })?.password)

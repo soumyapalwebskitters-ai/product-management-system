@@ -129,7 +129,7 @@ export async function writeShop(db: Sql, state: State, revision: number) {
       statement(
         `INSERT INTO variants (
            id, product_id, name, sku, image, items_per_box, price, buying_price, purchase_unit, selling_unit, current_stock, minimum_stock, desired_stock, position
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           variant.id,
           variant.productId,

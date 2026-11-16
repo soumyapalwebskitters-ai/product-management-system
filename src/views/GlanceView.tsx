@@ -132,13 +132,12 @@ export function GlanceView() {
       ) : layout === 'list' ? (
         <div className="table-scroll">
           <table className="glance-table responsive">
-            <thead><tr><th>Product</th><th>Image</th><th>Variant</th><th>Variant image</th><th className="num">Selling price</th></tr></thead>
+            <thead><tr><th>Product</th><th>Variant</th><th>Variant image</th><th className="num">Selling price</th></tr></thead>
             <tbody>
               {groups.flatMap(({ product, variants }) =>
                 variants.map((variant, index) => (
                   <tr key={`${product.id}-${variant.name}-${index}`} className={index === 0 ? 'product-group-start' : undefined}>
                     {index === 0 && <td data-label="Product" rowSpan={variants.length}><strong>{product.name}</strong></td>}
-                    {index === 0 && <td data-label="Image" rowSpan={variants.length}>{product.image ? <ProductPhoto src={product.image} name={product.name} /> : '—'}</td>}
                     <td data-label="Variant">{variant.name || 'Standard'}</td><td data-label="Variant image">{variant.image ? <ProductPhoto src={galleryImageSrc(variant.image)} name={`${product.name} ${variant.name || 'Standard'}`} /> : '-'}</td>
                     <td data-label="Selling price" className="num">{sellingText(variant)}</td>
                   </tr>
@@ -151,11 +150,11 @@ export function GlanceView() {
         <div className="glance-grid">
           {groups.map(({ product, variants }) => (
             <article className="glance-card" key={product.id}>
-              {product.image ? <img src={product.image} alt="" /> : <div className="glance-placeholder"><Icon name="box" /></div>}
               <strong>{product.name}</strong>
               <div className="glance-variants">
                 {variants.map((variant, index) => (
                   <div className="glance-variant-row" key={`${variant.name}-${index}`}>
+                    {variant.image ? <ProductPhoto src={galleryImageSrc(variant.image)} name={`${product.name} ${variant.name || 'Standard'}`} /> : <span className="glance-variant-placeholder"><Icon name="box" /></span>}
                     <span>{variant.name || 'Standard'}</span><b>{sellingText(variant)}</b>
                   </div>
                 ))}

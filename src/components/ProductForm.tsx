@@ -115,7 +115,9 @@ function fromProduct(product: Product): DraftVariant[] {
     purchaseUnit: variant.purchaseUnit ?? 'item',
     purchaseQuantity: String((variant.purchaseUnit ?? 'item') === 'box' && variant.itemsPerBox > 0 ? Math.floor(variant.currentStock / variant.itemsPerBox) : variant.currentStock),
     purchaseQuantityTouched: false,
-    purchaseTotal: String((variant.buyingPrice ?? 0) * variant.currentStock),
+    // Normalize floating-point artifacts such as 4.4 * 50 = 220.00000000000003.
+    // Purchase totals are validated as whole rupees by the editor.
+    purchaseTotal: String(Math.round((variant.buyingPrice ?? 0) * variant.currentStock)),
     manualBuyingPrice: false,
     sellingUnit: variant.sellingUnit ?? 'item',
     manualSellingPrice: true,

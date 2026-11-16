@@ -84,6 +84,12 @@ function cleanImage(value: string | undefined, fallback: string) {
   if (value === undefined) return { ok: true as const, image: fallback }
   const image = value.trim()
   if (!image) return { ok: true as const, image: '' }
+  // Existing catalog records may use a hosted gallery URL. Preserve it when
+  // the edit form sends the unchanged value; newly supplied photos must still
+  // be cropped data URLs.
+  if (image === fallback.trim() && /^https?:\/\//i.test(image)) {
+    return { ok: true as const, image }
+  }
   if (!image.startsWith('data:image/') || image.length > MAX_IMAGE) {
     return { ok: false as const, error: 'Use a cropped product photo.' }
   }
