@@ -41,6 +41,7 @@ export type ActionResult = { ok: true } | { ok: false; error: string }
 export const DUPLICATE_DATA_ERROR = 'Duplicate data found.'
 
 type MarketApi = {
+  staff: boolean
   state: State
   notice: string | null
   dismissNotice: () => void
@@ -66,7 +67,7 @@ type MarketApi = {
   removeGalleryImage: (id: string) => Promise<ActionResult>
 }
 
-type ShopPayload = { revision: number; state: State; fresh: boolean }
+type ShopPayload = { revision: number; state: State; fresh: boolean; staff: boolean }
 
 type SaveResult =
   | { ok: true; revision: number }
@@ -98,7 +99,7 @@ function openOrderMail(state: State, order: CustomerOrder, event: 'placed' | 'de
 function parsePayload(value: unknown): ShopPayload | null {
   if (!isRecord(value) || typeof value.revision !== 'number' || !Number.isInteger(value.revision)) return null
   if (!isState(value.state)) return null
-  return { revision: value.revision, state: value.state, fresh: value.fresh === true }
+  return { revision: value.revision, state: value.state, fresh: value.fresh === true, staff: value.staff === true }
 }
 
 async function errorMessage(body: unknown, fallback: string) {
@@ -136,7 +137,7 @@ async function saveShop(revision: number, state: State): Promise<SaveResult> {
   return { ok: true, revision: body.revision }
 }
 
-let shopLoad: Promise<{ state: State; revision: number }> | null = null
+let shopLoad: Promise<{ state: State; revision: number; staff: boolean }> | null = null
 
 function loadShop() {
   shopLoad ??= fetchShop().catch((error: unknown) => {
@@ -162,15 +163,15 @@ async function fetchShop() {
   if (!response.ok) throw new Error(await errorMessage(body, 'Could not load the shop from D1.'))
   const payload = parsePayload(body)
   if (!payload) throw new Error('The shop data was not valid.')
-  if (!payload.fresh) return { state: ensureState(payload.state), revision: payload.revision }
+  if (!payload.fresh) return { state: ensureState(payload.state), revision: payload.revision, staff: payload.staff }
 
   const next = emptyShop()
   const saved = await saveShop(0, next)
   if (!saved.ok) {
-    if ('conflict' in saved) return { state: ensureState(saved.conflict.state), revision: saved.conflict.revision }
+    if ('conflict' in saved) return { state: ensureState(saved.conflict.state), revision: saved.conflict.revision, staff: payload.staff }
     throw new Error(saved.error)
   }
-  return { state: next, revision: saved.revision }
+  return { state: next, revision: saved.revision, staff: payload.staff }
 }
 
 function Boot({
@@ -227,6 +228,7 @@ function SavingOverlay() {
 }
 
 export function MarketProvider({ children }: { children: ReactNode }) {
+  const [staff, setStaff] = useState(false)
   const [state, setState] = useState<State | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [duplicateNotice, setDuplicateNotice] = useState<number | null>(null)
@@ -246,6 +248,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     loadShop()
       .then((loaded) => {
         if (cancelled) return
+        setStaff(loaded.staff)
         stateRef.current = loaded.state
         revisionRef.current = loaded.revision
         setState(loaded.state)
@@ -284,6 +287,13 @@ export function MarketProvider({ children }: { children: ReactNode }) {
           setNotice('The shop was saved somewhere else. Loaded the latest copy.')
           return
         }
+        try {
+          const latest = await fetchShop()
+          stateRef.current = latest.state
+          revisionRef.current = latest.revision
+          setState(latest.state)
+          setStaff(latest.staff)
+        } catch { /* Keep the save error visible if the network is also unavailable. */ }
         setNotice(result.error)
       })
       .finally(() => {
@@ -308,6 +318,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     }
 
     return {
+      staff,
       state,
       notice,
       dismissNotice,
@@ -414,7 +425,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         }
       },
     }
-  }, [dismissNotice, notice, persist, state])
+  }, [dismissNotice, notice, persist, staff, state])
 
   if (bootError) {
     return (

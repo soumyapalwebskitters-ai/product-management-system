@@ -1699,3 +1699,99 @@ input:focus, textarea:focus, select:focus {
 .product-review-form .review-glance-variant header { background-color: var(--soft) !important; color: var(--ink) !important; }
 .product-review-form .review-glance-product { background-color: var(--soft) !important; }
 @media (max-width: 620px) { .review-glance-variant dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .review-glance-variant header { flex-direction: column; gap: 2px; } }
+
+/* Shared minimal workspace: light buyer desk and dark seller desk. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --paper: #ffffff;
+  --ink: #20242c; --on-ink: #ffffff; --muted: #69717f;
+  --line: #e5e8ee; --line-strong: #cdd3de;
+  --accent: #5261c7; --on-accent: #ffffff; --focus: #5261c724;
+  --highlight: #eef0f7; --soft: #f3f5f9; --row-hover: #f5f6fa;
+  --mark: #e5e9fc; --selection: #dfe4ff;
+  --shadow: 0 12px 36px #202c4610;
+  --serif: var(--sans); --space-3: 16px; --space-4: 24px; --space-5: 32px;
+}
+:root[data-theme="dark"] {
+  --bg: #111319; --surface: #191c24; --paper: #20242e;
+  --ink: #edf0f7; --on-ink: #141720; --muted: #a1a9b9;
+  --line: #2b303d; --line-strong: #424b60;
+  --accent: #a5afff; --on-accent: #171c3b; --focus: #a5afff24;
+  --highlight: #282e43; --soft: #202530; --row-hover: #222735;
+  --mark: #323b65; --selection: #3a4575;
+  --shadow: 0 12px 36px #00000024;
+}
+body { line-height: 1.55; }
+.wrap { width: min(1280px, calc(100% - 64px)); }
+.topbar { background: var(--surface); }
+.topbar-inner { padding: 20px 0 16px; gap: 20px; }
+.mark { width: 42px; height: 42px; border-radius: 12px; background: var(--accent); color: var(--on-accent); }
+.wordmark { letter-spacing: .02em; }
+.role-switch { padding: 4px; border-radius: 12px; background: var(--soft); }
+.role-switch::before { inset: 4px auto 4px 4px; width: calc(50% - 4px); border-radius: 9px; }
+.role-switch:has(button:nth-child(2)[aria-pressed="true"])::before { transform: translateX(100%); }
+.role-switch button { min-height: 40px; padding: 8px 18px; }
+.subnav { gap: 8px; padding-bottom: 12px; }
+.subnav button, .seller-menu-group summary { min-height: 42px; border-radius: 9px; padding: 10px 16px; }
+.seller-menu-groups { gap: 8px; }
+.seller-menu-group > div { padding: 8px; border-radius: 12px; box-shadow: var(--shadow); }
+main.wrap { padding-top: 32px; padding-bottom: 40px; }
+.page-head { gap: 20px; margin-bottom: 26px; align-items: center; }
+.page-head h2 { font-size: clamp(26px, 3vw, 34px); line-height: 1.2; font-weight: 600; letter-spacing: -.035em; }
+.page-head > div { gap: 8px; }
+.lede { line-height: 1.6; }
+.summary { gap: 16px; margin-bottom: 24px; }
+.summary article, .stat { padding: 20px; border-radius: 14px; }
+.summary strong { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.toolbar { gap: 12px; margin: 20px 0; }
+.filters { gap: 8px; flex-wrap: wrap; }
+.product-card, .settings-card, .glance-card, .account-chart, .seller-lock { border-radius: 14px; padding: 22px; }
+.surface-table, .table-scroll, .empty { border-radius: 14px; }
+.empty { padding: 40px 24px; }
+th { padding: 14px 16px; font-size: 12px; letter-spacing: .025em; background: var(--soft); }
+td { padding: 16px; }
+.btn, .footer-settings { min-height: 42px; padding: 10px 16px; border-radius: 9px; font-weight: 600; }
+.btn.small { min-height: 34px; padding: 6px 10px; }
+.chip { border-radius: 8px; padding: 7px 12px; }
+.field { gap: 8px; margin-top: 16px; }
+.field input, .field textarea, .buyer-search input { min-height: 44px; border-radius: 9px; padding: 10px 12px; }
+.fields { gap: 16px; }
+.dialog { padding: 26px; border-radius: 18px; box-shadow: var(--shadow); }
+.dialog-actions { gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.select-box { border: 1px solid var(--line); border-radius: 9px; min-width: 170px; }
+.select-box select[hidden] { display: none; }
+.select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: 100%; min-height: 44px; padding: 10px 38px 10px 14px; border: 0; border-radius: inherit; background: transparent; text-align: left; font-weight: 500; }
+.select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-trigger[aria-expanded="true"] .ui-icon { transform: rotate(180deg); }
+.select-trigger:disabled { cursor: not-allowed; opacity: .5; }
+.select-options { position: fixed; z-index: 2100; overflow-y: auto; padding: 6px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow); animation: notice-in 140ms ease-out; }
+.select-options [role="option"] { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 42px; padding: 10px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+.select-options .is-active { background: var(--highlight); }
+.select-options [aria-selected="true"] { color: var(--accent); font-weight: 600; }
+.select-options [aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
+.gallery-page, .gallery-groups { gap: 28px; }
+.gallery-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+.gallery-card { gap: 14px; padding: 12px; border-radius: 14px; }
+.gallery-image-button { overflow: hidden; border-radius: 10px; }
+.gallery-card img { display: block; height: 220px; border-radius: 10px; transition: transform 220ms ease; }
+.gallery-image-button:hover img { transform: scale(1.035); }
+.gallery-card > div { padding: 0 4px 6px; gap: 4px; }
+.gallery-group-head { padding-bottom: 14px; }
+.gallery-group-head h3 { font-size: 20px; font-weight: 600; }
+main.wrap > section { animation: workspace-in 220ms ease-out both; }
+@keyframes workspace-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 760px) {
+  .wrap { width: calc(100% - 32px); }
+  .topbar-inner { padding-top: 16px; gap: 12px; }
+  main.wrap { padding-top: 24px; }
+  .page-head { align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+  .product-card, .settings-card, .glance-card, .account-chart { padding: 16px; }
+  .summary { gap: 12px; }
+  .summary article { padding: 16px; }
+  .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; }
+  .gallery-card img { height: 170px; }
+  .dialog { padding: 20px; }
+  .subnav button, .seller-menu-group summary { padding: 9px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

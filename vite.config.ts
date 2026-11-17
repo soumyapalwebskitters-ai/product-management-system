@@ -5,14 +5,14 @@ import { handleDevRequest, type NodeRequest, type NodeResponse } from './server/
 
 function shopMiddleware(req: NodeRequest & { url?: string }, res: NodeResponse, next: () => void) {
   const path = req.url?.split('?')[0]
-  if (path !== '/api/state' && path !== '/api/gallery-image' && !path?.startsWith('/api/auth/')) {
+  if (!path?.startsWith('/api/')) {
     next()
     return
   }
-  void handleDevRequest(req, res).catch((error: unknown) => {
+  void handleDevRequest(req, res).catch(() => {
     res.statusCode = 500
     res.setHeader('content-type', 'application/json; charset=utf-8')
-    res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Could not use the shop database.' }))
+    res.end(JSON.stringify({ error: 'Could not use the shop database.' }))
   })
 }
 

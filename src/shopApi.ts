@@ -13,14 +13,8 @@ export async function handleState(method: string, body: unknown, db: Sql) {
     if (method === 'PUT') return saveState(db, body)
     return { status: 405, body: { error: 'Method not allowed.' } }
   } catch (error) {
-    const message = error instanceof Error ? error.message : ''
     console.error('Shop state request failed', error)
-    const errorText = message.includes('no such table')
-      ? 'D1 tables are missing. Apply the database migrations and reload.'
-      : message
-        ? `Could not use the shop database: ${message}`
-        : 'Could not use the shop database.'
-    return { status: 500, body: { error: errorText } }
+    return { status: 500, body: { error: 'Could not use the shop database.' } }
   }
 }
 
@@ -84,6 +78,7 @@ export async function handleGallery(method: string, body: unknown, db: Sql) {
     }
     if (method !== 'POST' || !isRecord(image)) return { status: 400, body: { error: 'Invalid gallery request.' } }
     if (!isText(image.id, 120) || !isText(image.productId, 120) || !isText(image.variantId, 120) || !isText(image.url) || !isText(image.createdAt, 80)) return { status: 400, body: { error: 'Gallery image data was not valid.' } }
+    try { const url = new URL(image.url); if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error() } catch { return { status: 400, body: { error: 'Invalid image URL.' } } }
     const variant = await db.first<{ id: string }>('SELECT id FROM variants WHERE id = ? AND product_id = ?', [image.variantId, image.productId])
     if (!variant) return { status: 400, body: { error: 'Choose a valid product variant.' } }
     const duplicate = await db.first<{ id: string }>('SELECT id FROM gallery_images WHERE variant_id = ? AND url = ?', [image.variantId, image.url])
@@ -96,6 +91,6 @@ export async function handleGallery(method: string, body: unknown, db: Sql) {
     return { status: 200, body: { revision } }
   } catch (error) {
     console.error('Gallery save failed', error)
-    return { status: 500, body: { error: error instanceof Error ? `Could not save gallery image: ${error.message}` : 'Could not save gallery image.' } }
+    return { status: 500, body: { error: 'Could not save gallery image.' } }
   }
 }

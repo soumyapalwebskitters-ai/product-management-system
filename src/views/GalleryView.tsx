@@ -7,7 +7,7 @@ import { galleryImageSrc, normalizeDriveImageUrl } from '../gallery'
 
 type GalleryEntry = { id: string; url: string; label: string }
 
-export function GalleryView() {
+export function GalleryView({ readOnly = false }: { readOnly?: boolean }) {
   const { state, addGalleryImage, removeGalleryImage } = useMarket()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -41,6 +41,7 @@ export function GalleryView() {
   }, [lightbox])
 
   async function save() {
+    if (readOnly) return
     if (!selectedId) { setError('Choose a product variant.'); return }
     const cleanUrl = url.trim()
     if (!cleanUrl) { setError('Paste a Google Drive image URL.'); return }
@@ -56,29 +57,30 @@ export function GalleryView() {
   }
 
   async function remove(id: string) {
+    if (readOnly) return
     const result = await removeGalleryImage(id)
     if (!result.ok) setError(result.error)
   }
 
   return <section className="gallery-page">
-    <div className="page-head"><div><h2><Icon name="eye" /> Gallery</h2><p className="lede">Add Google Drive image links and assign them to a product variant.</p></div></div>
-    <section className="gallery-add settings-card">
+    <div className="page-head"><div><h2><Icon name="eye" /> Gallery</h2><p className="lede">{readOnly ? 'Explore product photos. Select an image for a closer look.' : 'Add Google Drive image links and assign them to a product variant.'}</p></div></div>
+    {!readOnly && <section className="gallery-add settings-card">
       <h3>Add gallery image</h3><p className="hint">Set the Drive file to “Anyone with the link” and paste its share URL.</p>
       <ProductSelect label="Choose product variant" placeholder="Search product or variant" options={options} query={query} mode={mode} selectedId={selectedId} onQueryChange={setQuery} onModeChange={setMode} onSelect={setSelectedId} />
       <label className="field"><span>Google Drive image URL</span><input type="url" value={url} placeholder="https://drive.google.com/uc?id=..." onChange={(event) => setUrl(event.target.value)} /></label>
       {url && <img className="gallery-preview" src={galleryImageSrc(normalizeDriveImageUrl(url))} alt="Preview" onError={(event) => { event.currentTarget.style.display = 'none' }} onLoad={(event) => { event.currentTarget.style.display = 'block' }} />}
       {error && <p className="error" role="alert">{error}</p>}
       <div className="dialog-actions"><button type="button" className="btn" onClick={save}>Add to gallery</button></div>
-    </section>
+    </section>}
     <section className="gallery-groups" aria-label="Product gallery">
-      {linked.length === 0 ? <div className="empty"><Icon name="eye" /><h3>No gallery images yet</h3><p>Add a Drive image and assign it to a variant.</p></div> : groups.map((group) => {
+      {linked.length === 0 ? <div className="empty"><Icon name="eye" /><h3>No gallery images yet</h3><p>{readOnly ? 'Product photos will appear here when available.' : 'Add a Drive image and assign it to a variant.'}</p></div> : groups.map((group) => {
         const items = group.items.map(({ item, variantName }) => ({ id: item.id, url: item.url, label: `${group.productName} · ${variantName}` }))
         return <section className="gallery-group" key={group.productName}>
           <div className="gallery-group-head"><h3>{group.productName}</h3><span>{items.length} image{items.length === 1 ? '' : 's'}</span></div>
           <div className="gallery-grid">{group.items.map(({ item, variantName }, index) => <article className="gallery-card" key={item.id}>
             <button type="button" className="gallery-image-button" aria-label={`Open ${group.productName} ${variantName} images`} onClick={() => setLightbox({ items, index })}><img src={galleryImageSrc(item.url)} alt={`${group.productName} ${variantName}`} /></button>
             <div><strong>{variantName}</strong><span>Click image to view gallery</span></div>
-            <button type="button" className="btn danger-text small" onClick={() => void remove(item.id)}>Remove</button>
+            {!readOnly && <button type="button" className="btn danger-text small" onClick={() => void remove(item.id)}>Remove</button>}
           </article>)}</div>
         </section>
       })}

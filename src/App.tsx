@@ -24,6 +24,7 @@ type Route =
   | { role: 'seller'; view: SellerView }
   | { role: 'buyer'; view: 'buyers'; buyerId: string | null }
   | { role: 'buyer'; view: 'offers' }
+  | { role: 'buyer'; view: 'gallery' }
 
 const sellerLinks: Array<{ id: SellerView; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
   { id: 'products', label: 'All products', icon: 'box' }, { id: 'glance', label: 'Product at a glance', icon: 'eye' },
@@ -47,6 +48,7 @@ const sellerGroups = [
 function readRoute(): Route {
   const parts = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean)
   if (parts[0] === 'buyer') {
+    if (parts[1] === 'gallery') return { role: 'buyer', view: 'gallery' }
     if (parts[1] === 'offers') return { role: 'buyer', view: 'offers' }
     return { role: 'buyer', view: 'buyers', buyerId: parts[1] ?? null }
   }
@@ -68,15 +70,13 @@ function readRoute(): Route {
 }
 
 function titleFor(route: Route) {
-  if (route.role === 'buyer') return route.view === 'offers' ? 'Offers' : 'Buyers'
+  if (route.role === 'buyer') return route.view === 'gallery' ? 'Gallery' : route.view === 'offers' ? 'Offers' : 'Buyers'
   return sellerLinks.find((link) => link.id === route.view)?.label ?? 'All products'
 }
 
 export function App() {
-  const { notice, dismissNotice, state } = useMarket()
+  const { notice, dismissNotice, state, staff } = useMarket()
   const [route, setRoute] = useState<Route>(readRoute)
-  const [sellerUnlocked, setSellerUnlocked] = useState(false)
-  const [sellerSessionChecked, setSellerSessionChecked] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [sellerLoginPending, setSellerLoginPending] = useState(false)
@@ -110,54 +110,9 @@ export function App() {
     return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
   }, [])
 
-  useEffect(() => {
-    if (route.role !== 'seller') {
-      setSellerSessionChecked(false)
-      return
-    }
-    let cancelled = false
-    setSellerSessionChecked(false)
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then(async (response) => ({ response, body: await response.json().catch(() => null) }))
-      .then(({ response, body }) => {
-        if (cancelled) return
-        const seller = response.ok && typeof body === 'object' && body !== null && 'account' in body && typeof body.account === 'object' && body.account !== null && 'role' in body.account && body.account.role === 'seller'
-        if (seller) {
-          setSellerUnlocked(true)
-          setSellerSessionChecked(true)
-          return
-        }
-        if (!import.meta.env.DEV) {
-          setSellerUnlocked(false)
-          setSellerSessionChecked(true)
-          return
-        }
-        fetch('/api/auth/seller/auto-login', { method: 'POST' })
-          .then(async (autoResponse) => ({ autoResponse, autoBody: await autoResponse.json().catch(() => null) }))
-          .then(({ autoResponse, autoBody }) => {
-            if (cancelled) return
-            const autoSeller = autoResponse.ok && typeof autoBody === 'object' && autoBody !== null && 'account' in autoBody && typeof autoBody.account === 'object' && autoBody.account !== null && 'role' in autoBody.account && autoBody.account.role === 'seller'
-            setSellerUnlocked(autoSeller)
-            setSellerSessionChecked(true)
-          })
-          .catch(() => {
-            if (!cancelled) {
-              setSellerUnlocked(false)
-              setSellerSessionChecked(true)
-            }
-          })
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSellerUnlocked(false)
-          setSellerSessionChecked(true)
-        }
-      })
-    return () => { cancelled = true }
-  }, [route.role])
-
   function go(next: Route) {
     if (next.role === 'seller') window.location.hash = `/seller/${next.view}`
+    else if (next.view === 'gallery') window.location.hash = '/buyer/gallery'
     else if (next.view === 'offers') window.location.hash = '/buyer/offers'
     else if (next.buyerId) window.location.hash = `/buyer/${next.buyerId}`
     else window.location.hash = '/buyer'
@@ -165,7 +120,7 @@ export function App() {
   }
 
   const role: Role = route.role
-  const locked = role === 'seller' && (!sellerSessionChecked || !sellerUnlocked)
+  const locked = role === 'seller' && !staff
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = role === 'seller' ? 'dark' : 'light'
@@ -184,6 +139,10 @@ export function App() {
               <h1>{role === 'seller' ? 'Seller' : 'Buyer'}</h1>
             </div>
           </div>
+          {staff && <button type="button" className="btn secondary" onClick={async () => {
+            const response = await fetch('/api/auth/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+            if (response.ok) window.location.reload()
+          }}>Sign out</button>}
           <div className="role-switch" role="group" aria-label="Desk">
             <button type="button" aria-pressed={role === 'seller'} onClick={() => { setPassword(''); setPasswordError(''); go({ role: 'seller', view: 'products' }) }}>
               <Icon name="store" /> Seller
@@ -214,7 +173,7 @@ export function App() {
                     aria-current={route.role === 'buyer' && route.view === 'buyers' && !route.buyerId ? 'page' : undefined}
                     onClick={() => go({ role: 'buyer', view: 'buyers', buyerId: null })}
                   >
-                    All buyers
+                    {staff ? 'All buyers' : 'Products'}
                   </button>
                   <button
                     type="button"
@@ -223,6 +182,7 @@ export function App() {
                   >
                     Offers
                   </button>
+                  <button type="button" aria-current={route.role === 'buyer' && route.view === 'gallery' ? 'page' : undefined} onClick={() => go({ role: 'buyer', view: 'gallery' })}>Gallery</button>
                 </>
               )}
           </nav>
@@ -238,7 +198,7 @@ export function App() {
             </button>
           </div>
         )}
-        {locked ? <section className="seller-lock"><h2><Icon name="lock" /> Seller access</h2>{!sellerSessionChecked ? <p>Checking seller session…</p> : <><p>Enter the seller password to continue.</p>{passwordError && <p className="error">{passwordError}</p>}<form onSubmit={async (event) => { event.preventDefault(); if (!password || sellerLoginPending) { if (!password) setPasswordError('Enter the seller password.'); return } setSellerLoginPending(true); try { const response = await fetch('/api/auth/seller/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) }); const body = await response.json().catch(() => null); if (!response.ok) { setPasswordError(typeof body?.error === 'string' ? body.error : 'Could not unlock Seller.'); return } setPassword(''); setPasswordError(''); setSellerUnlocked(true); setSellerSessionChecked(true) } catch { setPasswordError('Could not reach Seller access.') } finally { setSellerLoginPending(false) } }}><label className="field">Seller password<input type="password" autoFocus autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="btn" type="submit" disabled={sellerLoginPending}>{sellerLoginPending ? <><span className="spinner" aria-hidden="true" /> Checking…</> : <><Icon name="unlock" /> Unlock seller</>}</button></form></>}</section> : null}
+        {locked ? <section className="seller-lock"><h2><Icon name="lock" /> Seller access</h2><><p>Enter the seller password to continue.</p>{passwordError && <p className="error">{passwordError}</p>}<form onSubmit={async (event) => { event.preventDefault(); if (!password || sellerLoginPending) { if (!password) setPasswordError('Enter the seller password.'); return } setSellerLoginPending(true); try { const response = await fetch('/api/auth/seller/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) }); const body = await response.json().catch(() => null); if (!response.ok) { setPasswordError(typeof body?.error === 'string' ? body.error : 'Could not unlock Seller.'); return } setPassword(''); setPasswordError(''); window.location.reload() } catch { setPasswordError('Could not reach Seller access.') } finally { setSellerLoginPending(false) } }}><label className="field">Seller password<input type="password" autoFocus autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="btn" type="submit" disabled={sellerLoginPending}>{sellerLoginPending ? <><span className="spinner" aria-hidden="true" /> Checking…</> : <><Icon name="unlock" /> Unlock seller</>}</button></form></></section> : null}
         {!locked && route.role === 'seller' && route.view === 'products' && <ProductsView />}
         {!locked && route.role === 'seller' && route.view === 'glance' && <GlanceView />}
         {!locked && route.role === 'seller' && route.view === 'gallery' && <GalleryView />}
@@ -252,13 +212,15 @@ export function App() {
         {!locked && route.role === 'seller' && route.view === 'offers' && <OffersView editable />}
         {!locked && route.role === 'seller' && route.view === 'suppliers' && <HistoryView />}
         {!locked && route.role === 'seller' && route.view === 'profile' && <SellerInfoView />}
-        {route.role === 'buyer' && route.view === 'buyers' && (
+        {route.role === 'buyer' && route.view === 'buyers' && !staff && <GlanceView />}
+        {staff && route.role === 'buyer' && route.view === 'buyers' && (
           <BuyerDesk
             buyerId={route.buyerId}
             onOpenBuyer={(buyerId) => go({ role: 'buyer', view: 'buyers', buyerId })}
           />
         )}
         {route.role === 'buyer' && route.view === 'offers' && <OffersView editable={false} />}
+        {route.role === 'buyer' && route.view === 'gallery' && <GalleryView readOnly />}
         <footer className="footer">
           <p>Saved in the shop database.</p>
         </footer>

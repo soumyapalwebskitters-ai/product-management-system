@@ -9,7 +9,8 @@
     "preview": "node --experimental-sqlite ./node_modules/vite/bin/vite.js preview",
     "deploy": "npm run build && wrangler deploy",
     "db:apply:remote": "wrangler d1 migrations apply market --remote",
-    "test": "node --experimental-sqlite --import tsx --test src/purchase.test.ts src/inventory.test.ts src/search.test.ts src/offers.test.ts src/orders.test.ts src/paymentStatus.test.ts src/records.test.ts src/persist.test.ts"
+    "test": "node --experimental-sqlite --import tsx --test src/purchase.test.ts src/inventory.test.ts src/search.test.ts src/offers.test.ts src/orders.test.ts src/paymentStatus.test.ts src/records.test.ts src/persist.test.ts src/security.test.ts",
+    "test:security": "node --experimental-sqlite --import tsx --test src/security.test.ts"
   },
   "dependencies": {
     "react": "^19.1.0",
