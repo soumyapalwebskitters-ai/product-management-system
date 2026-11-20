@@ -23,6 +23,17 @@ export type NodeResponse = {
 }
 
 let database: Sql | null = null
+let queryDatabase: Sql | null = null
+function localQueryDatabase() {
+  if (!queryDatabase) {
+    const directory = join(process.cwd(), '../baji-market-website/.data')
+    mkdirSync(directory, { recursive: true })
+    const db = new DatabaseSync(join(directory, 'reviews.sqlite'))
+    for (const file of readdirSync(join(process.cwd(), 'website-migrations')).filter(name => name.endsWith('.sql')).sort()) db.exec(readFileSync(join(process.cwd(), 'website-migrations', file), 'utf8'))
+    queryDatabase = toSql(db)
+  }
+  return queryDatabase
+}
 
 function toSql(db: DatabaseSync): Sql {
   return {
@@ -110,7 +121,7 @@ export async function handleDevRequest(req: NodeRequest, res: NodeResponse) {
     try { body = await readBody(req) } catch { res.statusCode = 413; res.end('Request is too large.'); return }
   }
   const request = new Request(`http://${headers.get('host') ?? 'localhost'}${req.url ?? '/'}`, { method, headers, body })
-  const response = await handleApi(request, localDatabase(), { setupToken: process.env.SELLER_SETUP_TOKEN, clientIp: req.socket?.remoteAddress ?? 'local' })
+  const response = await handleApi(request, localDatabase(), { setupToken: process.env.SELLER_SETUP_TOKEN, queriesDb: ['/api/product-queries', '/api/testimonials', '/api/web-content', '/api/web-media'].some(path => req.url?.split('?')[0] === path || req.url?.startsWith(path + '/')) ? localQueryDatabase() : undefined, clientIp: req.socket?.remoteAddress ?? 'local' })
   res.statusCode = response.status
   response.headers.forEach((value, name) => res.setHeader(name, name === 'set-cookie' ? value.replace('; Secure', '') : value))
   res.end(new Uint8Array(await response.arrayBuffer()))

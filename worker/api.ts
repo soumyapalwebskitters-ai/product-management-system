@@ -1,3 +1,5 @@
+import { publicWeb, manageWeb } from './webManagement'
+import { readProductQueries } from './productQueries'
 import { handleGallery, handleState } from '../src/shopApi'
 import { readShop } from '../src/persist'
 import type { Sql } from '../src/sql'
@@ -29,7 +31,7 @@ export function publicState(state: State): State {
     seller: state.seller,
   }
 }
-export type ApiOptions = { setupToken?: string; clientIp?: string }
+export type ApiOptions = { setupToken?: string; clientIp?: string; queriesDb?: Sql }
 export async function handleApi(request: Request, db: Sql, options: ApiOptions = {}): Promise<Response> {
   try {
     const path = new URL(request.url).pathname
@@ -49,6 +51,7 @@ export async function handleApi(request: Request, db: Sql, options: ApiOptions =
       const result = await logout(db, request)
       return json(result.body, result.status, { 'set-cookie': expiredSessionCookie() })
     }
+    if (request.method === 'GET' && (path === '/api/web-content' || path.startsWith('/api/web-media/'))) return await publicWeb(request, options.queriesDb)
     const account = await currentAccount(db, request)
     if (path === '/api/auth/me' && request.method === 'GET') return account ? json({ account }) : json({ error: 'Authentication required.' }, 401)
     if (path === '/api/state' && request.method === 'GET') {
@@ -60,9 +63,17 @@ export async function handleApi(request: Request, db: Sql, options: ApiOptions =
       const state: State = saved?.state ?? { products: [], purchases: [], movements: [], buyers: [], orders: [], offers: [], gallery: [] }
       return json({ revision: saved?.revision ?? 0, fresh: false, staff: false, state: publicState(state) })
     }
-    if (!['/api/state', '/api/gallery', '/api/auth/buyers', '/api/auth/seller/password'].includes(path)) return json({ error: 'Not found.' }, 404)
+    if (!['/api/state', '/api/gallery', '/api/auth/buyers', '/api/auth/seller/password', '/api/product-queries', '/api/web-content', '/api/web-media', '/api/testimonials'].includes(path)) return json({ error: 'Not found.' }, 404)
     if (!account) return json({ error: 'Seller sign-in is required.' }, 401)
     if (account.role !== 'seller') return json({ error: 'Seller access is required.' }, 403)
+    if (['/api/web-content', '/api/web-media', '/api/testimonials'].includes(path)) {
+      if (!options.queriesDb) return json({ error: 'Website database is not configured.' }, 503)
+      return await manageWeb(request, options.queriesDb)
+    }
+    if (path === '/api/product-queries' && request.method === 'GET') {
+      if (!options.queriesDb) return json({ error: 'Product query database is not configured.' }, 503)
+      return json(await readProductQueries(request, options.queriesDb))
+    }
     if (path === '/api/auth/seller/password' && request.method === 'PUT') return authResponse(await resetSellerPassword(db, account, await readJson(request, 4096)))
     if (path === '/api/auth/buyers' && request.method === 'POST') return authResponse(await createBuyerAccount(db, account, await readJson(request, 4096)))
     if (path === '/api/gallery' && ['POST', 'DELETE'].includes(request.method)) {

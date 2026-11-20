@@ -1,3 +1,4 @@
+import { WebManagementView, TestimonialsView } from './views/WebManagementView'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { buyRows } from './inventory'
 import { useMarket } from './store'
@@ -15,10 +16,11 @@ import { SettingsView } from './views/SettingsView'
 import { StockView } from './views/StockView'
 import { SellerBuyersView } from './views/SellerBuyersView'
 import { Icon } from './components/Icon'
+import { QueriesView } from './views/QueriesView'
 import { GalleryView } from './views/GalleryView'
 
 type Role = 'seller' | 'buyer'
-type SellerView = 'products' | 'glance' | 'gallery' | 'stock' | 'buy' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile' | 'buyers' | 'settings'
+type SellerView = 'products' | 'glance' | 'gallery' | 'stock' | 'buy' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile' | 'buyers' | 'settings' | 'query' | 'web-management' | 'testimonials'
 
 type Route =
   | { role: 'seller'; view: SellerView }
@@ -35,6 +37,9 @@ const sellerLinks: Array<{ id: SellerView; label: string; icon: Parameters<typeo
   { id: 'offers', label: 'Offers', icon: 'tag' }, { id: 'suppliers', label: 'Supplier orders', icon: 'factory' },
   { id: 'profile', label: 'Seller info', icon: 'user' }, { id: 'settings', label: 'Settings', icon: 'settings' },
   { id: 'buyers', label: 'Buyer info', icon: 'buyer' },
+  { id: 'web-management', label: 'Web management', icon: 'settings' },
+  { id: 'testimonials', label: 'Testimonials', icon: 'user' },
+  { id: 'query', label: 'Query', icon: 'receipt' },
   { id: 'accounts', label: 'Accounts', icon: 'receipt' },
 ]
 
@@ -42,7 +47,8 @@ const sellerGroups = [
   { label: 'Catalog', links: ['products', 'glance', 'gallery', 'recent'] },
   { label: 'Stock', links: ['stock', 'buy', 'suppliers'] },
   { label: 'Orders', links: ['delivery', 'offers'] },
-  { label: 'Business', links: ['profile', 'buyers'] },
+  { label: 'Booking', links: ['query'] },
+  { label: 'Business', links: ['profile', 'buyers', 'testimonials'] },
 ] as const
 
 function readRoute(): Route {
@@ -54,6 +60,8 @@ function readRoute(): Route {
   }
   const view = parts[0] === 'seller' ? parts[1] : parts[0]
   if (!parts.length) return { role: 'buyer', view: 'buyers', buyerId: null }
+  if (view === 'web-management' || view === 'testimonials') return { role: 'seller', view }
+  if (view === 'query') return { role: 'seller', view: 'query' }
   if (view === 'glance') return { role: 'seller', view: 'glance' }
   if (view === 'gallery') return { role: 'seller', view: 'gallery' }
   if (view === 'stock') return { role: 'seller', view: 'stock' }
@@ -164,7 +172,7 @@ export function App() {
                     const link = sellerLinks.find((item) => item.id === id)!
                     return <button key={link.id} type="button" aria-current={route.role === 'seller' && route.view === link.id ? 'page' : undefined} onClick={() => { setOpenSellerMenu(null); go({ role: 'seller', view: link.id }) }}><Icon name={link.icon} /> {link.label}{link.id === 'buy' && <span className="count" data-testid="restock-count">{restockCount}</span>}</button>
                   })}</div></details>)}
-                  {(() => { const link = sellerLinks.find((item) => item.id === 'accounts')!; return <button className="seller-account-link" type="button" aria-current={route.role === 'seller' && route.view === link.id ? 'page' : undefined} onClick={() => { setOpenSellerMenu(null); go({ role: 'seller', view: link.id }) }}><Icon name={link.icon} /> {link.label}</button> })()}
+                  {['accounts', 'web-management'].map(id => { const link = sellerLinks.find((item) => item.id === id)!; return <button key={id} className={id === 'web-management' ? 'seller-account-link seller-web-management-link' : 'seller-account-link'} type="button" aria-current={route.role === 'seller' && route.view === link.id ? 'page' : undefined} onClick={() => { setOpenSellerMenu(null); go({ role: 'seller', view: link.id }) }}><Icon name={link.icon} /> {link.label}</button> })}
                 </div>
               : (
                 <>
@@ -199,6 +207,9 @@ export function App() {
           </div>
         )}
         {locked ? <section className="seller-lock"><h2><Icon name="lock" /> Seller access</h2><><p>Enter the seller password to continue.</p>{passwordError && <p className="error">{passwordError}</p>}<form onSubmit={async (event) => { event.preventDefault(); if (!password || sellerLoginPending) { if (!password) setPasswordError('Enter the seller password.'); return } setSellerLoginPending(true); try { const response = await fetch('/api/auth/seller/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) }); const body = await response.json().catch(() => null); if (!response.ok) { setPasswordError(typeof body?.error === 'string' ? body.error : 'Could not unlock Seller.'); return } setPassword(''); setPasswordError(''); window.location.reload() } catch { setPasswordError('Could not reach Seller access.') } finally { setSellerLoginPending(false) } }}><label className="field">Seller password<input type="password" autoFocus autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><button className="btn" type="submit" disabled={sellerLoginPending}>{sellerLoginPending ? <><span className="spinner" aria-hidden="true" /> Checking…</> : <><Icon name="unlock" /> Unlock seller</>}</button></form></></section> : null}
+        {!locked && route.role === 'seller' && route.view === 'web-management' && <WebManagementView />}
+        {!locked && route.role === 'seller' && route.view === 'testimonials' && <TestimonialsView />}
+        {!locked && route.role === 'seller' && route.view === 'query' && <QueriesView />}
         {!locked && route.role === 'seller' && route.view === 'products' && <ProductsView />}
         {!locked && route.role === 'seller' && route.view === 'glance' && <GlanceView />}
         {!locked && route.role === 'seller' && route.view === 'gallery' && <GalleryView />}

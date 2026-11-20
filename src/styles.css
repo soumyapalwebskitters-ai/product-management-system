@@ -1795,3 +1795,6 @@ main.wrap > section { animation: workspace-in 220ms ease-out both; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Keep website management at the right edge of seller navigation. */
+.seller-web-management-link { margin-inline-start: auto; }

@@ -1,6 +1,6 @@
 import { handleApi } from './api'
 import type { Sql, SqlStatement, SqlValue } from '../src/sql'
-type Env = { DB: D1Database; SELLER_SETUP_TOKEN?: string }
+type Env = { DB: D1Database; REVIEWS_DB?: D1Database; SELLER_SETUP_TOKEN?: string }
 function d1(db: D1Database): Sql {
   return {
     async first<T>(sql: string, params: SqlValue[] = []) {
@@ -19,6 +19,6 @@ function d1(db: D1Database): Sql {
 
 export default {
   async fetch(request, env): Promise<Response> {
-    return handleApi(request, d1(env.DB), { setupToken: env.SELLER_SETUP_TOKEN, clientIp: request.headers.get('cf-connecting-ip') ?? 'unknown' })
+    return handleApi(request, d1(env.DB), { setupToken: env.SELLER_SETUP_TOKEN, queriesDb: env.REVIEWS_DB ? d1(env.REVIEWS_DB) : undefined, clientIp: request.headers.get('cf-connecting-ip') ?? 'unknown' })
   },
 } satisfies ExportedHandler<Env>
