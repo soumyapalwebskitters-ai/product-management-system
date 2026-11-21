@@ -1,5 +1,5 @@
 import { publicWeb, manageWeb } from './webManagement'
-import { readProductQueries } from './productQueries'
+import { readProductQueries, updateProductQueryStatus } from './productQueries'
 import { handleGallery, handleState } from '../src/shopApi'
 import { readShop } from '../src/persist'
 import type { Sql } from '../src/sql'
@@ -63,7 +63,7 @@ export async function handleApi(request: Request, db: Sql, options: ApiOptions =
       const state: State = saved?.state ?? { products: [], purchases: [], movements: [], buyers: [], orders: [], offers: [], gallery: [] }
       return json({ revision: saved?.revision ?? 0, fresh: false, staff: false, state: publicState(state) })
     }
-    if (!['/api/state', '/api/gallery', '/api/auth/buyers', '/api/auth/seller/password', '/api/product-queries', '/api/web-content', '/api/web-media', '/api/testimonials'].includes(path)) return json({ error: 'Not found.' }, 404)
+    if (!['/api/state', '/api/gallery', '/api/auth/buyers', '/api/auth/seller/password', '/api/product-queries', '/api/customer-users', '/api/web-content', '/api/web-media', '/api/testimonials'].includes(path)) return json({ error: 'Not found.' }, 404)
     if (!account) return json({ error: 'Seller sign-in is required.' }, 401)
     if (account.role !== 'seller') return json({ error: 'Seller access is required.' }, 403)
     if (['/api/web-content', '/api/web-media', '/api/testimonials'].includes(path)) {
@@ -73,6 +73,36 @@ export async function handleApi(request: Request, db: Sql, options: ApiOptions =
     if (path === '/api/product-queries' && request.method === 'GET') {
       if (!options.queriesDb) return json({ error: 'Product query database is not configured.' }, 503)
       return json(await readProductQueries(request, options.queriesDb))
+    }
+    if (path === '/api/product-queries' && request.method === 'PATCH') {
+      if (!options.queriesDb) return json({ error: 'Website database is not configured.' }, 503)
+      const body = await readJson(request, 4096) as { id?: unknown; status?: unknown }
+      const id = typeof body.id === 'string' ? body.id : ''
+      const status = typeof body.status === 'string' ? body.status : ''
+      const updated = await updateProductQueryStatus(options.queriesDb, id, status)
+      if (status === 'will buy') {
+        const query = await options.queriesDb.first<{ name: string; phone: string; email: string; location: string }>('SELECT name, phone, email, location FROM "product query" WHERE id = ?', [id])
+        if (query) {
+          const existing = await db.first<{ id: string }>('SELECT id FROM buyers WHERE (phone <> \'\' AND phone = ?) OR lower(name) = lower(?) LIMIT 1', [query.phone, query.name])
+          if (!existing) {
+            const now = new Date().toISOString()
+            const position = (await db.first<{ nextPosition: number }>('SELECT COALESCE(MAX(position), -1) + 1 AS nextPosition FROM buyers'))?.nextPosition ?? 0
+            await db.batch([{ sql: 'INSERT INTO buyers (id, name, phone, address, note, created_at, updated_at, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', params: [`buyer-${crypto.randomUUID()}`, query.name, query.phone, query.location, query.email ? `Email: ${query.email}` : '', now, now, position] }])
+          }
+        }
+      }
+      return json(updated)
+    }
+    if (path === '/api/customer-users' && options.queriesDb) {
+      if (!account || account.role !== 'seller') return json({ error: 'Seller access is required.' }, 403)
+      if (request.method === 'GET') return json({ users: await options.queriesDb.all<{ customer_id: string; name: string; phone: string; email: string; location: string; created_at: string; updated_at: string }>('SELECT customer_id, name, phone, email, location, created_at, updated_at FROM customer_profiles ORDER BY updated_at DESC, created_at DESC') })
+      if (request.method === 'DELETE') {
+        const body = await readJson(request, 2048) as { customerId?: unknown }
+        if (typeof body.customerId !== 'string' || !body.customerId.trim()) return json({ error: 'Customer id is required.' }, 400)
+        await options.queriesDb.batch([{ sql: 'DELETE FROM customer_profiles WHERE customer_id = ?', params: [body.customerId.trim()] }])
+        return json({ deleted: true })
+      }
+      return json({ error: 'Method not allowed.' }, 405)
     }
     if (path === '/api/auth/seller/password' && request.method === 'PUT') return authResponse(await resetSellerPassword(db, account, await readJson(request, 4096)))
     if (path === '/api/auth/buyers' && request.method === 'POST') return authResponse(await createBuyerAccount(db, account, await readJson(request, 4096)))

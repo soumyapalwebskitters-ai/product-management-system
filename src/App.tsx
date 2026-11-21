@@ -18,9 +18,10 @@ import { SellerBuyersView } from './views/SellerBuyersView'
 import { Icon } from './components/Icon'
 import { QueriesView } from './views/QueriesView'
 import { GalleryView } from './views/GalleryView'
+import { UsersView } from './views/UsersView'
 
 type Role = 'seller' | 'buyer'
-type SellerView = 'products' | 'glance' | 'gallery' | 'stock' | 'buy' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile' | 'buyers' | 'settings' | 'query' | 'web-management' | 'testimonials'
+type SellerView = 'products' | 'glance' | 'gallery' | 'stock' | 'buy' | 'delivery' | 'accounts' | 'recent' | 'offers' | 'suppliers' | 'profile' | 'buyers' | 'users' | 'settings' | 'query' | 'web-management' | 'testimonials'
 
 type Route =
   | { role: 'seller'; view: SellerView }
@@ -36,7 +37,7 @@ const sellerLinks: Array<{ id: SellerView; label: string; icon: Parameters<typeo
   { id: 'delivery', label: 'Delivery', icon: 'truck' }, { id: 'recent', label: 'Last added', icon: 'clock' },
   { id: 'offers', label: 'Offers', icon: 'tag' }, { id: 'suppliers', label: 'Supplier orders', icon: 'factory' },
   { id: 'profile', label: 'Seller info', icon: 'user' }, { id: 'settings', label: 'Settings', icon: 'settings' },
-  { id: 'buyers', label: 'Buyer info', icon: 'buyer' },
+  { id: 'buyers', label: 'Buyer info', icon: 'buyer' }, { id: 'users', label: 'Logged-in users', icon: 'user' },
   { id: 'web-management', label: 'Web management', icon: 'settings' },
   { id: 'testimonials', label: 'Testimonials', icon: 'user' },
   { id: 'query', label: 'Query', icon: 'receipt' },
@@ -48,7 +49,7 @@ const sellerGroups = [
   { label: 'Stock', links: ['stock', 'buy', 'suppliers'] },
   { label: 'Orders', links: ['delivery', 'offers'] },
   { label: 'Booking', links: ['query'] },
-  { label: 'Business', links: ['profile', 'buyers', 'testimonials'] },
+  { label: 'Business', links: ['profile', 'buyers', 'users', 'testimonials'] },
 ] as const
 
 function readRoute(): Route {
@@ -73,6 +74,7 @@ function readRoute(): Route {
   if (view === 'recent') return { role: 'seller', view: 'recent' }
   if (view === 'offers') return { role: 'seller', view: 'offers' }
   if (view === 'suppliers' || view === 'history') return { role: 'seller', view: 'suppliers' }
+  if (view === 'users') return { role: 'seller', view: 'users' }
   if (view === 'profile') return { role: 'seller', view: 'profile' }
   return { role: 'seller', view: 'products' }
 }
@@ -216,6 +218,7 @@ export function App() {
         {!locked && route.role === 'seller' && route.view === 'stock' && <StockView />}
         {!locked && route.role === 'seller' && route.view === 'settings' && <SettingsView />}
         {!locked && route.role === 'seller' && route.view === 'buyers' && <SellerBuyersView />}
+        {!locked && route.role === 'seller' && route.view === 'users' && <UsersView />}
         {!locked && route.role === 'seller' && route.view === 'buy' && <NeedToBuyView />}
         {!locked && route.role === 'seller' && route.view === 'delivery' && <DeliveryView />}
         {!locked && route.role === 'seller' && route.view === 'accounts' && <AccountsView />}

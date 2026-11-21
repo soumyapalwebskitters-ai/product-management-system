@@ -21,6 +21,11 @@
       "database_name": "market",
       "database_id": "f5dacd2e-39db-4689-b5ec-f1d523b0bb61",
       "migrations_dir": "migrations"
+    },
+    {
+      "binding": "REVIEWS_DB",
+      "database_name": "baji-market-reviews",
+      "database_id": "89aba547-ec24-4260-a721-01b53dc78c34"
     }
   ]
 }
