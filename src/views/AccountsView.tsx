@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../components/Icon'
 import { ProductPhoto } from '../components/ProductImageField'
 import { formatWhen, paymentLabel, rupees } from '../format'
@@ -20,6 +20,27 @@ export function AccountsView() {
   const entries = useMemo(() => matchingOrders.filter((order) => account === null || order.paymentMethod === account), [account, matchingOrders])
   const analytics = useMemo(() => accountAnalytics(state, entries), [entries, state])
   const buyers = useMemo(() => buyerAccounts(entries, state), [entries, state.buyers])
+  const [pipeline, setPipeline] = useState<PipelineStats>({ queries: 0, willBuy: 0, loggedIn: 0, loading: true })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    async function loadPipeline() {
+      try {
+        const [allResponse, willBuyResponse, usersResponse] = await Promise.all([
+          fetch('/api/product-queries?page=1&q=&status=', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal }),
+          fetch('/api/product-queries?page=1&q=&status=will%20buy', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal }),
+          fetch('/api/customer-users', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal }),
+        ])
+        if (!allResponse.ok || !willBuyResponse.ok || !usersResponse.ok) throw new Error('Analytics unavailable')
+        const [all, willBuy, users] = await Promise.all([allResponse.json() as Promise<{ total?: number }>, willBuyResponse.json() as Promise<{ total?: number }>, usersResponse.json() as Promise<{ users?: unknown[] }>])
+        setPipeline({ queries: Number(all.total) || 0, willBuy: Number(willBuy.total) || 0, loggedIn: Array.isArray(users.users) ? users.users.length : 0, loading: false })
+      } catch (error) {
+        if (!controller.signal.aborted) setPipeline(current => ({ ...current, loading: false }))
+      }
+    }
+    void loadPipeline()
+    return () => controller.abort()
+  }, [])
 
   return <section className="accounts-page" data-testid="view-accounts">
     <div className="page-head accounts-head"><div><span className="eyebrow"><Icon name="receipt" /> Finance workspace</span><h2>Accounts</h2><p className="lede">Track collections, outstanding balances, margins, and the products that keep your business moving.</p></div><div className="account-context"><Icon name="adjust" /><span>{account ? paymentLabel(account) : 'All payment methods'}</span></div></div>
@@ -37,6 +58,16 @@ export function AccountsView() {
         <Insight icon="clock" label="Largest balance due" value={analytics.largestDue ? analytics.largestDue.name + ' - ' + rupees(analytics.largestDue.due) : 'No balance due'} detail={analytics.largestDue ? 'Prioritize this collection' : 'All recorded sales are settled'} />
         <Insight icon="factory" label="Inventory investment" value={rupees(analytics.purchased)} detail="Value of purchase entries" />
       </div>
+      <section className="account-pipeline" aria-label="Customer pipeline analytics">
+        <div className="account-section-heading"><div><span className="eyebrow"><Icon name="buyer" /> Customer pipeline</span><h3>Query to buyer conversion</h3><p>Compare sales enquiries that became buyers with online customer accounts.</p></div><span className="trending-period">Live data</span></div>
+        <div className="account-insights pipeline-insights">
+          <Insight icon="receipt" label="Product queries" value={pipeline.loading ? '—' : pipeline.queries.toLocaleString()} detail="All enquiries received" />
+          <Insight icon="buyer" label="Converted to buyer" value={pipeline.loading ? '—' : pipeline.willBuy.toLocaleString()} detail="Marked “Will buy”" />
+          <Insight icon="sales" label="Query conversion rate" value={pipeline.loading ? '—' : conversionRate(pipeline.queries, pipeline.willBuy) + '%'} detail="Queries becoming buyers" />
+          <Insight icon="user" label="Online login users" value={pipeline.loading ? '—' : pipeline.loggedIn.toLocaleString()} detail="Google or Facebook accounts" />
+        </div>
+        <div className="pipeline-progress" aria-label="Query conversion progress"><div><span>Converted queries</span><strong>{pipeline.loading ? '—' : pipeline.willBuy + ' of ' + pipeline.queries}</strong></div><i style={{ width: (pipeline.loading ? 0 : Math.min(100, conversionRate(pipeline.queries, pipeline.willBuy))) + '%' }} /></div>
+      </section>
       <div className="account-charts">
         <article className="account-chart"><ChartTitle icon="receipt" title="Collection by method" detail="Amount received through each route" /><PaymentPie values={analytics.paymentMethods} /></article>
         <article className="account-chart wide-chart"><ChartTitle icon="sales" title="Order frequency" detail="Recent sales by day" /><OrderBars values={analytics.orderDays} /></article>
@@ -54,7 +85,7 @@ export function AccountsView() {
 }
 
 function Metric({ icon, label, value, detail, tone, primary }: { icon: 'sales' | 'receipt' | 'clock' | 'tag'; label: string; value: string; detail: string; tone?: string; primary?: boolean }) { return <article className={'account-metric ' + (primary ? 'primary ' : '') + (tone ?? '')}><span className="metric-icon"><Icon name={icon} /></span><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></article> }
-function Insight({ icon, label, value, detail }: { icon: 'buyer' | 'box' | 'clock' | 'factory'; label: string; value: string; detail: string }) { return <article><Icon name={icon} /><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></article> }
+function Insight({ icon, label, value, detail }: { icon: 'buyer' | 'box' | 'clock' | 'factory' | 'receipt' | 'sales' | 'user'; label: string; value: string; detail: string }) { return <article><Icon name={icon} /><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></article> }
 function ChartTitle({ icon, title, detail }: { icon: 'receipt' | 'sales' | 'box'; title: string; detail: string }) { return <div className="chart-title"><div><h3>{title}</h3><p>{detail}</p></div><Icon name={icon} /></div> }
 function EmptyState({ title, body }: { title: string; body: string }) { return <div className="empty"><Icon name="receipt" /><h3>{title}</h3><p>{body}</p></div> }
 function buyerAccounts(entries: CustomerOrder[], state: Pick<State, 'buyers'>) { const groups = new Map<string, CustomerOrder[]>(); entries.forEach((order) => groups.set(order.buyerId, [...(groups.get(order.buyerId) ?? []), order])); return [...groups.entries()].map(([buyerId, orders]) => { const buyer = state.buyers.find((item) => item.id === buyerId); return { id: buyerId, name: buyer?.name ?? orders[0].buyerName, phone: buyer?.phone ?? '', sales: orders.length, received: orders.reduce((sum, order) => sum + receivedOn(order, null), 0), due: orders.reduce((sum, order) => sum + orderDue(order), 0), lastAt: orders[0].createdAt } }).sort((a, b) => b.lastAt.localeCompare(a.lastAt) || a.name.localeCompare(b.name)) }
@@ -81,3 +112,5 @@ function TrendingProducts({ values, sales }: { values: Array<{ id: string; name:
 }
 function receivedOn(order: CustomerOrder, account: PaymentMethod | null) { if (account && order.paymentMethod !== account) return 0; return Math.min(Math.max(0, order.paid), order.total) }
 function dayKey(iso: string) { const date = new Date(iso); if (Number.isNaN(date.getTime())) return ''; return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') }
+type PipelineStats = { queries: number; willBuy: number; loggedIn: number; loading: boolean }
+function conversionRate(total: number, converted: number) { return total ? Math.round((converted / total) * 100) : 0 }

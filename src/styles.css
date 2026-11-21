@@ -1595,6 +1595,13 @@ input:focus, textarea:focus, select:focus {
 .account-metric.primary span:not(.metric-icon), .account-metric.primary small { color: var(--muted); }
 .account-metric.primary .metric-icon { color: var(--accent); background: var(--soft); }
 .account-dashboard, .account-ledger { margin: 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.account-pipeline { margin: 18px 0 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.account-pipeline .account-section-heading { margin-bottom: 12px; }
+.pipeline-insights { margin-bottom: 12px; }
+.pipeline-progress { display: grid; gap: 7px; }
+.pipeline-progress > div { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.pipeline-progress strong { color: var(--ink); }
+.pipeline-progress > i { display: block; width: 0; height: 7px; border-radius: 999px; background: var(--accent); transition: width .35s ease; }
 .account-section-heading { display: flex; gap: 20px; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
 .account-section-heading h3 { margin: 5px 0 4px; font-family: var(--serif); font-size: 24px; }
 .account-section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
